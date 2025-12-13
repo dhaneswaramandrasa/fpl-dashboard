@@ -177,7 +177,7 @@ class FPLDataScraper:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         season_agg = (
-            df.groupby(['full_name', 'position'], as_index=False)
+            df.groupby(['full_name', 'player_team', 'position'], as_index=False)
             .agg({
                 'round': 'count',
                 'starts': 'sum',
