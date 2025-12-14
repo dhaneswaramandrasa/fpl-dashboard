@@ -48,8 +48,13 @@ def show(player_data, match_data):
         st.markdown("### 🔧 Filters")
         
         # Position filter
-        positions = ["All"] + sorted(player_data['position'].unique().tolist())
-        selected_position = st.selectbox("Position", positions, key="overview_position")
+        unique_positions = player_data['position'].dropna().unique().tolist()
+
+        selected_position = st.selectbox(
+            "Filter by Position",
+            ["All"] + sorted(unique_positions),
+            key="comp_position"
+        )
         
         # Minimum minutes filter
         min_minutes = st.slider(

@@ -308,7 +308,7 @@ class ComprehensiveFPLScraper:
             return group
         
         df = df.sort_values(['full_name', 'round']).reset_index(drop=True)
-        df = df.groupby(['full_name','player_name','player_team','position'], group_keys=False).apply(calc_rolling)
+        df = df.groupby('full_name', group_keys=False).apply(calc_rolling)
         return df
     
     def calculate_home_away_splits(self, df):
@@ -319,7 +319,7 @@ class ComprehensiveFPLScraper:
         away_df = df[df['venue'] == 'Away'].copy()
         
         # Group by player
-        home_stats = home_df.groupby(['full_name','player_name','player_team','position'], as_index=False).agg({
+        home_stats = home_df.groupby('full_name', as_index=False).agg({
             'minutes': 'sum',
             'total_points': 'sum',
             'goals_scored': 'sum',
@@ -353,7 +353,7 @@ class ComprehensiveFPLScraper:
             'round': 'games_home'
         })
         
-        away_stats = away_df.groupby(['full_name','player_name','player_team','position'], as_index=False).agg({
+        away_stats = away_df.groupby('full_name', as_index=False).agg({
             'minutes': 'sum',
             'total_points': 'sum',
             'goals_scored': 'sum',
@@ -481,7 +481,7 @@ class ComprehensiveFPLScraper:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         season_agg = (
-            df.groupby(['full_name','player_name','player_team', 'position'], as_index=False)
+            df.groupby(['player_name','full_name' 'player_team','position'], as_index=False)
             .agg({
                 'round': 'count',
                 'starts': 'sum',
@@ -722,7 +722,7 @@ class ComprehensiveFPLScraper:
         return defensive_df, attacking_df
 
 
-def scrape_all_data():
+def scrape_all_comprehensive_data():
     """Main function to scrape comprehensive FPL data"""
     scraper = ComprehensiveFPLScraper()
     

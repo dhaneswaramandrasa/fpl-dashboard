@@ -50,13 +50,13 @@ def show(player_data, match_data):
     col1, col2, col3 = st.columns([2, 2, 1])
     
     with col1:
+        unique_positions = player_data['position'].dropna().unique().tolist()
         # Filter options
         position_filter = st.selectbox(
             "Filter by Position",
-            ["All"] + sorted(player_data['position'].unique().tolist()),
+            ["All"] + sorted(unique_positions),
             key="comp_position"
         )
-    
     with col2:
         min_minutes = st.slider(
             "Minimum Minutes",

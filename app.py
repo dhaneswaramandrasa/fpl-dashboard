@@ -166,17 +166,18 @@ if st.session_state.data_loaded:
     with col1:
         st.markdown("#### 🔥 Top 10 Players in Form")
         hot_players = st.session_state.player_data[st.session_state.player_data['minutes_last_5'] >= 360].nlargest(10, 'points_per90_last_5')[
-            ['full_name', 'player_team','position', 'points_per90_last_5', 'form_trend_points']
+            ['player_name', 'player_team','position', 'points_per90_last_5', 'form_trend_points']
         ]
         hot_players.columns = ['Player', 'Team', 'Pos', 'Pts/90 (L5)', 'Form Trend']
         st.dataframe(hot_players, hide_index=True, use_container_width=True)
+
     
     with col2:
         st.markdown("#### ⚡ Top 10 xGI per 90 (L5)")
         top_xgi = st.session_state.player_data[
             st.session_state.player_data['minutes_last_5'] >= 360
         ].nlargest(10, 'xGI_per90_last_5')[
-            ['full_name', 'player_team', 'position', 'xGI_per90_last_5', 'points_last_5']
+            ['player_name', 'player_team', 'position', 'xGI_per90_last_5', 'points_last_5']
         ]
         top_xgi.columns = ['Player', 'Team', 'Pos', 'xGI/90', 'Points (L5)']
         st.dataframe(top_xgi, hide_index=True, use_container_width=True)
