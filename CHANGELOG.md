@@ -1,3 +1,104 @@
+## Version 2.0 - 2024-12-15
+
+### 🎉 MAJOR UPDATE: Comprehensive Metrics
+
+#### ✨ New Features
+
+**1. Defensive Contribution Metrics**
+- Full defensive stats from FPL API
+- `defensive_contribution`, `tackles`, `clearances_blocks_interceptions`
+- All with per 90 and home/away splits
+- Helps identify defensive assets and bonus potential
+
+**2. Start Percentage Tracking**
+- Track how often players start vs come off bench
+- `start_percentage` - identify nailed starters vs rotation risks
+- `starts_last_5` - recent starting frequency
+- Home/away start splits
+
+**3. BPS/90 and Bonus/90**
+- Comprehensive bonus point tracking
+- `bps_per90_season`, `bonus_per90_season`
+- `form_trend_bps` - trending up or down
+- Home/away splits for BPS and bonus
+
+**4. Home/Away Form Splits (40+ metrics)**
+- Every major metric now has home and away versions
+- `points_home_per90`, `points_away_per90`
+- `xGI_home_per90`, `xGI_away_per90`
+- `bps_home_per90`, `bps_away_per90`
+- `def_contrib_home_per90`, `def_contrib_away_per90`
+- `home_away_points_diff`, `home_away_xGI_diff`
+
+**5. npXG (Non-Penalty Expected Goals)**
+- `npxG`, `npxGI` - open-play performance
+- `npxG_per90_season`, `npxGI_per90_season`
+- `estimated_penalties` - penalty taker identification
+- `npxG_overperformance` - clinical finishing metric
+- Home/away splits
+
+#### 📊 New Columns Available
+
+**Total: 100+ new columns**
+
+**Defensive (10+):**
+- defensive_contribution_per90_season
+- tackles_per90_season
+- clearances_blocks_interceptions_per90_season
+- recoveries_per90_season
+- Plus all home/away splits
+
+**Start Tracking (5+):**
+- start_percentage
+- starts_home, starts_away
+- starts_last_5
+
+**BPS/Bonus (15+):**
+- bps_per90_season, bonus_per90_season
+- form_trend_bps
+- bps/bonus home/away splits
+- Rolling averages (last 3/5/10)
+
+**Home/Away (40+):**
+- All major metrics split by venue
+- Performance differentials
+
+**npXG (10+):**
+- npxG/npxGI season and rolling
+- Penalty estimates
+- Overperformance metrics
+
+#### 🎯 Use Cases
+
+- ✅ Find rotation-proof defenders with high defensive contribution
+- ✅ Target players with better home form before home fixtures
+- ✅ Identify bonus magnets with high BPS/90
+- ✅ Compare open-play performance (npxG) vs penalties
+- ✅ Monitor start percentage for rotation risks
+
+#### 🔧 Technical Changes
+
+**Enhanced Scraper:**
+- Comprehensive data extraction from FPL API
+- New `defensive_contribution` field support
+- Home/away aggregation system
+- Start percentage calculation
+- npXG estimation algorithm
+
+**Data Pipeline:**
+- All numeric fields properly typed
+- Home/away split calculations
+- Per 90 metrics for all stats
+- Rolling windows with venue splits
+
+#### 📚 Documentation
+
+- New `COMPREHENSIVE_METRICS_GUIDE.md` with full metric explanations
+- Use case examples and analysis patterns
+- Dashboard visualization ideas
+
+---
+
 # Changelog - FPL Dashboard
 
 ## Version 1.2 (Latest) - 2024-12-13
