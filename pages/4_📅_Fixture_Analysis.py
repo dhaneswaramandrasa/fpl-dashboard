@@ -1,6 +1,7 @@
 """
 Fixture Analysis Page
 Analyze upcoming fixtures and rank teams by fixture difficulty
+UPDATED: Calendar first, improved colors, skip nearly-complete gameweeks
 """
 
 import streamlit as st
@@ -35,6 +36,21 @@ if 'team_defensive' not in st.session_state or st.session_state.team_defensive i
 defensive_df = st.session_state.team_defensive
 attacking_df = st.session_state.team_attacking
 
+def get_fdr_color(fdr):
+    """Get color based on FDR - turquoise for easy, pink for hard"""
+    if fdr <= 2.0:
+        return '#40E0D0'  # Turquoise - Easy
+    elif fdr <= 2.5:
+        return '#7FFFD4'  # Aquamarine - Easy-Medium
+    elif fdr <= 3.0:
+        return '#E0E0E0'  # Light Gray - Medium
+    elif fdr <= 3.5:
+        return '#FFB6C1'  # Light Pink - Medium-Hard
+    elif fdr <= 4.0:
+        return '#FF69B4'  # Hot Pink - Hard
+    else:
+        return '#FF1493'  # Deep Pink - Very Hard
+
 def show(defensive_df, attacking_df):
     """Display fixture analysis page"""
     
@@ -56,12 +72,12 @@ def show(defensive_df, attacking_df):
         st.markdown("---")
         st.markdown("### 📊 FDR Scale (1-5)")
         st.markdown("""
-        **Rigid 5-Step Rating:**
-        - 🟢 **1.0-2.0**: Easy
-        - 🟢 **2.0-2.5**: Moderate-Easy  
-        - 🟡 **2.5-3.0**: Medium
-        - 🟠 **3.0-4.0**: Difficult
-        - 🔴 **4.0-5.0**: Very Hard
+        **Color Guide:**
+        - 🟦 **1.0-2.0**: Easy
+        - 🟦 **2.0-2.5**: Moderate-Easy  
+        - ⬜ **2.5-3.0**: Medium
+        - 🟪 **3.0-4.0**: Difficult
+        - 🟥 **4.0-5.0**: Very Hard
         
         **Heatmap:**
         - CAPITAL = Home (e.g., BOU)
@@ -155,20 +171,20 @@ def show(defensive_df, attacking_df):
     
     st.markdown("---")
     
-    # Create tabs
+    # Create tabs - FIXTURE CALENDAR FIRST as requested
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📊 Fixture Difficulty Rankings",
         "🗓️ Fixture Calendar",
+        "📊 Fixture Difficulty Rankings",
         "🎯 Best Picks",
         "📈 Advanced Stats",
         "📋 Detailed Breakdown"
     ])
     
     with tab1:
-        show_fixture_rankings(team_fixtures, next_n_gw)
+        show_fixture_calendar(team_fixtures, next_n_gw, current_gw)
     
     with tab2:
-        show_fixture_calendar(team_fixtures, next_n_gw, current_gw)
+        show_fixture_rankings(team_fixtures, next_n_gw)
     
     with tab3:
         show_best_picks(team_fixtures, defensive_df, attacking_df, next_n_gw)
@@ -179,94 +195,8 @@ def show(defensive_df, attacking_df):
     with tab5:
         show_detailed_breakdown(detailed_fixtures, team_fixtures)
 
-def show_fixture_rankings(df, next_n_gw):
-    """Show fixture difficulty rankings"""
-    
-    st.subheader("📊 Team Fixture Difficulty Rankings")
-    
-    # Bar chart of average difficulty
-    fig = go.Figure()
-    
-    # Rigid 5-step color based on FDR (1-5 scale)
-    def get_fdr_color(fdr):
-        if fdr <= 2.0:
-            return '#27ae60'  # Green - Easy (FDR 1-2)
-        elif fdr <= 2.5:
-            return '#7DCE82'  # Light Green (FDR 2-2.5)
-        elif fdr <= 3.0:
-            return '#f1c40f'  # Yellow - Medium (FDR 2.5-3)
-        elif fdr <= 3.5:
-            return '#f39c12'  # Orange (FDR 3-3.5)
-        elif fdr <= 4.0:
-            return '#e67e22'  # Dark Orange (FDR 3.5-4)
-        else:
-            return '#e74c3c'  # Red - Hard (FDR 4-5)
-    
-    colors = [get_fdr_color(diff) for diff in df['avg_difficulty']]
-    
-    fig.add_trace(go.Bar(
-        x=df['short_name'],
-        y=df['avg_difficulty'],
-        marker_color=colors,
-        text=df['avg_difficulty'].round(2),
-        textposition='auto',
-        hovertemplate='<b>%{x}</b><br>' +
-                      'Avg Difficulty: %{y:.2f}<br>' +
-                      '<extra></extra>'
-    ))
-    
-    fig.update_layout(
-        title=f'Average Fixture Difficulty (Next {next_n_gw} Gameweeks)',
-        xaxis_title='Team',
-        yaxis_title='Difficulty Rating (1=Easy, 5=Hard)',
-        showlegend=False,
-        height=500,
-        yaxis=dict(range=[0, 5])
-    )
-    
-    # Add reference lines with labels
-    fig.add_hline(y=2.0, line_dash="dash", line_color="#27ae60", line_width=1,
-                  annotation_text="Easy (1-2)", annotation_position="right")
-    fig.add_hline(y=3.0, line_dash="dash", line_color="#f1c40f", line_width=1,
-                  annotation_text="Medium (2-3)", annotation_position="right")
-    fig.add_hline(y=4.0, line_dash="dash", line_color="#e74c3c", line_width=1,
-                  annotation_text="Hard (4-5)", annotation_position="right")
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Rankings table
-    st.markdown("#### 📋 Full Rankings Table")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("##### 🟢 Easiest Fixtures (Top 10)")
-        easy_teams = df.head(10)[['rank', 'short_name', 'fixtures', 'avg_difficulty']].copy()
-        easy_teams.columns = ['Rank', 'Team', 'Upcoming Fixtures', 'Avg FDR']
-        
-        st.dataframe(
-            easy_teams.style.format({
-                'Avg FDR': '{:.2f}'
-            }).background_gradient(subset=['Avg FDR'], cmap='RdYlGn_r'),
-            use_container_width=True,
-            hide_index=True
-        )
-    
-    with col2:
-        st.markdown("##### 🔴 Hardest Fixtures (Bottom 10)")
-        hard_teams = df.tail(10).sort_values('rank')[['rank', 'short_name', 'fixtures', 'avg_difficulty']].copy()
-        hard_teams.columns = ['Rank', 'Team', 'Upcoming Fixtures', 'Avg FDR']
-        
-        st.dataframe(
-            hard_teams.style.format({
-                'Avg FDR': '{:.2f}'
-            }).background_gradient(subset=['Avg FDR'], cmap='RdYlGn_r'),
-            use_container_width=True,
-            hide_index=True
-        )
-
 def show_fixture_calendar(df, next_n_gw, current_gw):
-    """Show fixture calendar heatmap"""
+    """Show fixture calendar heatmap with improved colors"""
     
     st.subheader("🗓️ Fixture Difficulty Calendar")
     
@@ -299,27 +229,27 @@ def show_fixture_calendar(df, next_n_gw, current_gw):
     heatmap_data = [scores + [None] * (max_len - len(scores)) for scores in heatmap_data]
     heatmap_text = [text + [''] * (max_len - len(text)) for text in heatmap_text]
     
-    # Create heatmap with rigid 5-color scale
+    # Create heatmap with new turquoise-to-pink color scheme
     gw_labels = [f"GW{current_gw + i}" for i in range(max_len)]
     
     fig = go.Figure(data=go.Heatmap(
         z=heatmap_data,
         x=gw_labels,
         y=teams,
-        # Rigid 5-step color scale: Green(1) -> Yellow(2-3) -> Red(4-5)
+        # New color scale: Turquoise (easy) -> White (medium) -> Pink (hard)
         colorscale=[
-            [0.0, '#27ae60'],    # 1.0 = Dark Green (Easy)
-            [0.25, '#7DCE82'],   # 2.0 = Light Green
-            [0.4, '#f1c40f'],    # 2.5 = Yellow (Medium)
-            [0.6, '#f39c12'],    # 3.0 = Orange
-            [0.8, '#e67e22'],    # 4.0 = Dark Orange
-            [1.0, '#e74c3c']     # 5.0 = Red (Hard)
+            [0.0, '#40E0D0'],    # 1.0 = Turquoise (Easy)
+            [0.25, '#7FFFD4'],   # 2.0 = Aquamarine
+            [0.4, '#E0E0E0'],    # 2.5 = Light Gray (Medium)
+            [0.6, '#FFB6C1'],    # 3.0 = Light Pink
+            [0.8, '#FF69B4'],    # 4.0 = Hot Pink (Hard)
+            [1.0, '#FF1493']     # 5.0 = Deep Pink (Very Hard)
         ],
         zmin=1,
         zmax=5,
         text=heatmap_text,
         texttemplate="%{text}",
-        textfont={"size": 11, "color": "white"},
+        textfont={"size": 11, "color": "black", "family": "Arial Black"},
         hovertemplate='<b>%{y}</b><br>' +
                       'GW: %{x}<br>' +
                       'vs %{text}<br>' +
@@ -371,231 +301,73 @@ def show_fixture_calendar(df, next_n_gw, current_gw):
             height=400
         )
 
-def show_advanced_stats(team_fixtures, defensive_df, attacking_df, next_n_gw, current_gw):
-    """Show advanced fixture statistics with xG and form data"""
+def show_fixture_rankings(df, next_n_gw):
+    """Show fixture difficulty rankings with improved colors"""
     
-    st.subheader("📈 Advanced Fixture Statistics")
+    st.subheader("📊 Team Fixture Difficulty Rankings")
     
-    st.markdown("""
-    Detailed breakdown of fixture difficulty factors including:
-    - Opponent's defensive form (xG conceded)
-    - Opponent's attacking threat (xG scored)
-    - Home/Away form splits
-    - Recent performance trends
-    """)
+    # Bar chart of average difficulty with new color scheme
+    fig = go.Figure()
     
-    # Team selector
-    team_options = team_fixtures['team'].tolist()
-    selected_teams = st.multiselect(
-        "Select teams to analyze (max 5)",
-        team_options,
-        default=team_options[:3],
-        max_selections=5
+    colors = [get_fdr_color(diff) for diff in df['avg_difficulty']]
+    
+    fig.add_trace(go.Bar(
+        x=df['short_name'],
+        y=df['avg_difficulty'],
+        marker_color=colors,
+        text=df['avg_difficulty'].round(2),
+        textposition='auto',
+        hovertemplate='<b>%{x}</b><br>' +
+                      'Avg Difficulty: %{y:.2f}<br>' +
+                      '<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=f'Average Fixture Difficulty (Next {next_n_gw} Gameweeks)',
+        xaxis_title='Team',
+        yaxis_title='Difficulty Rating (1=Easy, 5=Hard)',
+        showlegend=False,
+        height=500,
+        yaxis=dict(range=[0, 5])
     )
     
-    if not selected_teams:
-        st.info("👆 Select teams to see detailed statistics")
-        return
+    # Add reference lines
+    fig.add_hline(y=2.0, line_dash="dash", line_color="#40E0D0", line_width=2,
+                  annotation_text="Easy (1-2)", annotation_position="right")
+    fig.add_hline(y=3.0, line_dash="dash", line_color="#E0E0E0", line_width=2,
+                  annotation_text="Medium (2-3)", annotation_position="right")
+    fig.add_hline(y=4.0, line_dash="dash", line_color="#FF69B4", line_width=2,
+                  annotation_text="Hard (4-5)", annotation_position="right")
     
-    for team_name in selected_teams:
-        team_data = team_fixtures[team_fixtures['team'] == team_name].iloc[0]
-        
-        with st.expander(f"**{team_data['short_name']}** - Avg FDR: {team_data['avg_difficulty']:.2f}", expanded=True):
-            
-            # Get team stats
-            team_def = defensive_df[defensive_df['team'] == team_name]
-            team_att = attacking_df[attacking_df['team'] == team_name]
-            
-            # Team overview stats
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                if not team_att.empty:
-                    st.metric("Goals/Game", f"{team_att.iloc[0]['goals_per_game']:.2f}")
-                else:
-                    st.metric("Goals/Game", "N/A")
-            
-            with col2:
-                if not team_def.empty:
-                    st.metric("Conceded/Game", f"{team_def.iloc[0]['goals_conceded_per_game']:.2f}")
-                else:
-                    st.metric("Conceded/Game", "N/A")
-            
-            with col3:
-                if not team_def.empty:
-                    st.metric("Clean Sheets", f"{team_def.iloc[0]['clean_sheet_%']:.0f}%")
-                else:
-                    st.metric("Clean Sheets", "N/A")
-            
-            with col4:
-                st.metric("Upcoming FDR", f"{team_data['avg_difficulty']:.2f}")
-            
-            st.markdown("---")
-            
-            # Fixture-by-fixture breakdown
-            st.markdown(f"#### Next {next_n_gw} Fixtures")
-            
-            fixture_stats = []
-            
-            for i, (fixture, difficulty) in enumerate(zip(team_data['fixture_list'], team_data['difficulty_scores'])):
-                opponent = fixture.split('(')[0].strip()
-                venue = fixture.split('(')[1].replace(')', '').strip()
-                gw = current_gw + i
-                
-                # Get opponent stats
-                opp_def = defensive_df[defensive_df['short_name'] == opponent]
-                opp_att = attacking_df[attacking_df['short_name'] == opponent]
-                
-                # Venue emoji
-                venue_emoji = '🏠' if venue == 'H' else '✈️'
-                venue_text = 'Home' if venue == 'H' else 'Away'
-                
-                # Calculate key metrics
-                if venue == 'H':
-                    # Home fixture - look at opponent's away defensive record
-                    opp_goals_conceded = opp_def.iloc[0]['goals_conceded_per_game'] if not opp_def.empty else 0
-                    opp_goals_scored = opp_att.iloc[0]['goals_per_game'] if not opp_att.empty else 0
-                    attacking_potential = "High" if opp_goals_conceded > 1.5 else "Medium" if opp_goals_conceded > 1.0 else "Low"
-                    defensive_risk = "High" if opp_goals_scored > 1.5 else "Medium" if opp_goals_scored > 1.0 else "Low"
-                else:
-                    # Away fixture - look at opponent's home defensive record
-                    opp_goals_conceded = opp_def.iloc[0]['goals_conceded_per_game'] if not opp_def.empty else 0
-                    opp_goals_scored = opp_att.iloc[0]['goals_per_game'] if not opp_att.empty else 0
-                    attacking_potential = "Medium" if opp_goals_conceded > 1.3 else "Low" if opp_goals_conceded > 0.8 else "Very Low"
-                    defensive_risk = "High" if opp_goals_scored > 1.8 else "Medium" if opp_goals_scored > 1.3 else "Low"
-                
-                clean_sheet_prob = "High" if defensive_risk == "Low" else "Medium" if defensive_risk == "Medium" else "Low"
-                
-                fixture_stats.append({
-                    'GW': gw,
-                    'Venue': f"{venue_emoji} {venue_text}",
-                    'Opponent': opponent,
-                    'FDR': difficulty,
-                    'Opp Conceded/G': opp_goals_conceded,
-                    'Opp Scored/G': opp_goals_scored,
-                    'Attack Potential': attacking_potential,
-                    'CS Probability': clean_sheet_prob
-                })
-            
-            fixture_df = pd.DataFrame(fixture_stats)
-            
-            if not fixture_df.empty:
-                # Color coding for metrics
-                def color_fdr(val):
-                    if val < 2.5:
-                        return 'background-color: #27ae60; color: white'
-                    elif val < 3.5:
-                        return 'background-color: #f39c12; color: white'
-                    else:
-                        return 'background-color: #e74c3c; color: white'
-                
-                def color_potential(val):
-                    if val == 'High':
-                        return 'background-color: #27ae60; color: white'
-                    elif val == 'Medium':
-                        return 'background-color: #f39c12; color: white'
-                    else:
-                        return 'background-color: #e74c3c; color: white'
-                
-                styled_df = fixture_df.style.format({
-                    'FDR': '{:.2f}',
-                    'Opp Conceded/G': '{:.2f}',
-                    'Opp Scored/G': '{:.2f}'
-                }).applymap(color_fdr, subset=['FDR']) \
-                  .applymap(color_potential, subset=['Attack Potential', 'CS Probability'])
-                
-                st.dataframe(styled_df, use_container_width=True, hide_index=True)
-            
-            # Visualizations
-            st.markdown("#### 📊 Fixture Difficulty Trend")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # FDR trend line
-                fig_fdr = go.Figure()
-                
-                fig_fdr.add_trace(go.Scatter(
-                    x=[f"GW{current_gw + i}" for i in range(len(team_data['difficulty_scores']))],
-                    y=team_data['difficulty_scores'],
-                    mode='lines+markers',
-                    name='FDR',
-                    line=dict(color='#3498db', width=3),
-                    marker=dict(size=10)
-                ))
-                
-                # Add difficulty zones
-                fig_fdr.add_hline(y=2.5, line_dash="dash", line_color="green",
-                                 annotation_text="Easy", annotation_position="right")
-                fig_fdr.add_hline(y=3.5, line_dash="dash", line_color="red",
-                                 annotation_text="Hard", annotation_position="right")
-                
-                fig_fdr.update_layout(
-                    title="Fixture Difficulty Over Time",
-                    yaxis_title="FDR",
-                    yaxis=dict(range=[0, 5]),
-                    height=300
-                )
-                
-                st.plotly_chart(fig_fdr, use_container_width=True)
-            
-            with col2:
-                # Opponent quality breakdown
-                if not fixture_df.empty:
-                    fig_opp = go.Figure()
-                    
-                    fig_opp.add_trace(go.Bar(
-                        x=fixture_df['Opponent'],
-                        y=fixture_df['Opp Conceded/G'],
-                        name='Conceded/G',
-                        marker_color='#e74c3c'
-                    ))
-                    
-                    fig_opp.add_trace(go.Bar(
-                        x=fixture_df['Opponent'],
-                        y=fixture_df['Opp Scored/G'],
-                        name='Scored/G',
-                        marker_color='#27ae60'
-                    ))
-                    
-                    fig_opp.update_layout(
-                        title="Opponent Form",
-                        yaxis_title="Goals per Game",
-                        barmode='group',
-                        height=300
-                    )
-                    
-                    st.plotly_chart(fig_opp, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True)
     
-    # Summary comparison
-    if len(selected_teams) > 1:
-        st.markdown("---")
-        st.markdown("### 📊 Team Comparison")
-        
-        comparison_data = []
-        for team_name in selected_teams:
-            team_data = team_fixtures[team_fixtures['team'] == team_name].iloc[0]
-            team_att = attacking_df[attacking_df['team'] == team_name]
-            team_def = defensive_df[defensive_df['team'] == team_name]
-            
-            comparison_data.append({
-                'Team': team_data['short_name'],
-                'Avg FDR': team_data['avg_difficulty'],
-                'Goals/G': team_att.iloc[0]['goals_per_game'] if not team_att.empty else 0,
-                'Conceded/G': team_def.iloc[0]['goals_conceded_per_game'] if not team_def.empty else 0,
-                'CS%': team_def.iloc[0]['clean_sheet_%'] if not team_def.empty else 0,
-                'Fixtures': team_data['fixtures']
-            })
-        
-        comp_df = pd.DataFrame(comparison_data)
+    # Rankings table
+    st.markdown("#### 📋 Full Rankings Table")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("##### 🟦 Easiest Fixtures (Top 10)")
+        easy_teams = df.head(10)[['rank', 'short_name', 'fixtures', 'avg_difficulty']].copy()
+        easy_teams.columns = ['Rank', 'Team', 'Upcoming Fixtures', 'Avg FDR']
         
         st.dataframe(
-            comp_df.style.format({
-                'Avg FDR': '{:.2f}',
-                'Goals/G': '{:.2f}',
-                'Conceded/G': '{:.2f}',
-                'CS%': '{:.1f}%'
-            }).background_gradient(subset=['Avg FDR'], cmap='RdYlGn_r', vmin=1, vmax=5),
+            easy_teams.style.format({
+                'Avg FDR': '{:.2f}'
+            }).background_gradient(subset=['Avg FDR'], cmap='RdYlGn_r'),
+            use_container_width=True,
+            hide_index=True
+        )
+    
+    with col2:
+        st.markdown("##### 🟥 Hardest Fixtures (Bottom 10)")
+        hard_teams = df.tail(10).sort_values('rank')[['rank', 'short_name', 'fixtures', 'avg_difficulty']].copy()
+        hard_teams.columns = ['Rank', 'Team', 'Upcoming Fixtures', 'Avg FDR']
+        
+        st.dataframe(
+            hard_teams.style.format({
+                'Avg FDR': '{:.2f}'
+            }).background_gradient(subset=['Avg FDR'], cmap='RdYlGn_r'),
             use_container_width=True,
             hide_index=True
         )
@@ -728,6 +500,235 @@ def show_best_picks(team_fixtures, defensive_df, attacking_df, next_n_gw):
             st.markdown(f"**{team['short_name']}** - FDR: {team['avg_difficulty']:.2f}")
             st.caption(f"{team['fixtures']}")
 
+def show_advanced_stats(team_fixtures, defensive_df, attacking_df, next_n_gw, current_gw):
+    """Show advanced fixture statistics with xG and form data"""
+    
+    st.subheader("📈 Advanced Fixture Statistics")
+    
+    st.markdown("""
+    Detailed breakdown of fixture difficulty factors including:
+    - Opponent's defensive form (goals conceded)
+    - Opponent's attacking threat (goals scored)
+    - Home/Away form splits
+    - Recent performance trends
+    """)
+    
+    # Team selector
+    team_options = team_fixtures['team'].tolist()
+    selected_teams = st.multiselect(
+        "Select teams to analyze (max 5)",
+        team_options,
+        default=team_options[:3],
+        max_selections=5
+    )
+    
+    if not selected_teams:
+        st.info("👆 Select teams to see detailed statistics")
+        return
+    
+    for team_name in selected_teams:
+        team_data = team_fixtures[team_fixtures['team'] == team_name].iloc[0]
+        
+        with st.expander(f"**{team_data['short_name']}** - Avg FDR: {team_data['avg_difficulty']:.2f}", expanded=True):
+            
+            # Get team stats
+            team_def = defensive_df[defensive_df['team'] == team_name]
+            team_att = attacking_df[attacking_df['team'] == team_name]
+            
+            # Team overview stats
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                if not team_att.empty:
+                    st.metric("Goals/Game", f"{team_att.iloc[0]['goals_per_game']:.2f}")
+                else:
+                    st.metric("Goals/Game", "N/A")
+            
+            with col2:
+                if not team_def.empty:
+                    st.metric("Conceded/Game", f"{team_def.iloc[0]['goals_conceded_per_game']:.2f}")
+                else:
+                    st.metric("Conceded/Game", "N/A")
+            
+            with col3:
+                if not team_def.empty:
+                    st.metric("Clean Sheets", f"{team_def.iloc[0]['clean_sheet_%']:.0f}%")
+                else:
+                    st.metric("Clean Sheets", "N/A")
+            
+            with col4:
+                st.metric("Upcoming FDR", f"{team_data['avg_difficulty']:.2f}")
+            
+            st.markdown("---")
+            
+            # Fixture-by-fixture breakdown
+            st.markdown(f"#### Next {next_n_gw} Fixtures")
+            
+            fixture_stats = []
+            
+            for i, (fixture, difficulty) in enumerate(zip(team_data['fixture_list'], team_data['difficulty_scores'])):
+                opponent = fixture.split('(')[0].strip()
+                venue = fixture.split('(')[1].replace(')', '').strip()
+                gw = current_gw + i
+                
+                # Get opponent stats
+                opp_def = defensive_df[defensive_df['short_name'] == opponent]
+                opp_att = attacking_df[attacking_df['short_name'] == opponent]
+                
+                # Venue emoji
+                venue_emoji = '🏠' if venue == 'H' else '✈️'
+                venue_text = 'Home' if venue == 'H' else 'Away'
+                
+                # Calculate key metrics
+                if venue == 'H':
+                    # Home fixture
+                    opp_goals_conceded = opp_def.iloc[0]['goals_conceded_per_game'] if not opp_def.empty else 0
+                    opp_goals_scored = opp_att.iloc[0]['goals_per_game'] if not opp_att.empty else 0
+                    attacking_potential = "High" if opp_goals_conceded > 1.5 else "Medium" if opp_goals_conceded > 1.0 else "Low"
+                    defensive_risk = "High" if opp_goals_scored > 1.5 else "Medium" if opp_goals_scored > 1.0 else "Low"
+                else:
+                    # Away fixture
+                    opp_goals_conceded = opp_def.iloc[0]['goals_conceded_per_game'] if not opp_def.empty else 0
+                    opp_goals_scored = opp_att.iloc[0]['goals_per_game'] if not opp_att.empty else 0
+                    attacking_potential = "Medium" if opp_goals_conceded > 1.3 else "Low" if opp_goals_conceded > 0.8 else "Very Low"
+                    defensive_risk = "High" if opp_goals_scored > 1.8 else "Medium" if opp_goals_scored > 1.3 else "Low"
+                
+                clean_sheet_prob = "High" if defensive_risk == "Low" else "Medium" if defensive_risk == "Medium" else "Low"
+                
+                fixture_stats.append({
+                    'GW': gw,
+                    'Venue': f"{venue_emoji} {venue_text}",
+                    'Opponent': opponent,
+                    'FDR': difficulty,
+                    'Opp Conceded/G': opp_goals_conceded,
+                    'Opp Scored/G': opp_goals_scored,
+                    'Attack Potential': attacking_potential,
+                    'CS Probability': clean_sheet_prob
+                })
+            
+            fixture_df = pd.DataFrame(fixture_stats)
+            
+            if not fixture_df.empty:
+                # Color coding for metrics
+                def color_fdr(val):
+                    if val < 2.5:
+                        return 'background-color: #40E0D0; color: black'
+                    elif val < 3.5:
+                        return 'background-color: #E0E0E0; color: black'
+                    else:
+                        return 'background-color: #FF69B4; color: black'
+                
+                def color_potential(val):
+                    if val == 'High':
+                        return 'background-color: #40E0D0; color: black'
+                    elif val == 'Medium':
+                        return 'background-color: #E0E0E0; color: black'
+                    else:
+                        return 'background-color: #FF69B4; color: black'
+                
+                styled_df = fixture_df.style.format({
+                    'FDR': '{:.2f}',
+                    'Opp Conceded/G': '{:.2f}',
+                    'Opp Scored/G': '{:.2f}'
+                }).applymap(color_fdr, subset=['FDR']) \
+                  .applymap(color_potential, subset=['Attack Potential', 'CS Probability'])
+                
+                st.dataframe(styled_df, use_container_width=True, hide_index=True)
+            
+            # Visualizations
+            st.markdown("#### 📊 Fixture Difficulty Trend")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # FDR trend line
+                fig_fdr = go.Figure()
+                
+                fig_fdr.add_trace(go.Scatter(
+                    x=[f"GW{current_gw + i}" for i in range(len(team_data['difficulty_scores']))],
+                    y=team_data['difficulty_scores'],
+                    mode='lines+markers',
+                    name='FDR',
+                    line=dict(color='#3498db', width=3),
+                    marker=dict(size=10)
+                ))
+                
+                # Add difficulty zones
+                fig_fdr.add_hline(y=2.5, line_dash="dash", line_color="#40E0D0",
+                                 annotation_text="Easy", annotation_position="right")
+                fig_fdr.add_hline(y=3.5, line_dash="dash", line_color="#FF69B4",
+                                 annotation_text="Hard", annotation_position="right")
+                
+                fig_fdr.update_layout(
+                    title="Fixture Difficulty Over Time",
+                    yaxis_title="FDR",
+                    yaxis=dict(range=[0, 5]),
+                    height=300
+                )
+                
+                st.plotly_chart(fig_fdr, use_container_width=True)
+            
+            with col2:
+                # Opponent quality breakdown
+                if not fixture_df.empty:
+                    fig_opp = go.Figure()
+                    
+                    fig_opp.add_trace(go.Bar(
+                        x=fixture_df['Opponent'],
+                        y=fixture_df['Opp Conceded/G'],
+                        name='Conceded/G',
+                        marker_color='#FF69B4'
+                    ))
+                    
+                    fig_opp.add_trace(go.Bar(
+                        x=fixture_df['Opponent'],
+                        y=fixture_df['Opp Scored/G'],
+                        name='Scored/G',
+                        marker_color='#40E0D0'
+                    ))
+                    
+                    fig_opp.update_layout(
+                        title="Opponent Form",
+                        yaxis_title="Goals per Game",
+                        barmode='group',
+                        height=300
+                    )
+                    
+                    st.plotly_chart(fig_opp, use_container_width=True)
+    
+    # Summary comparison
+    if len(selected_teams) > 1:
+        st.markdown("---")
+        st.markdown("### 📊 Team Comparison")
+        
+        comparison_data = []
+        for team_name in selected_teams:
+            team_data = team_fixtures[team_fixtures['team'] == team_name].iloc[0]
+            team_att = attacking_df[attacking_df['team'] == team_name]
+            team_def = defensive_df[defensive_df['team'] == team_name]
+            
+            comparison_data.append({
+                'Team': team_data['short_name'],
+                'Avg FDR': team_data['avg_difficulty'],
+                'Goals/G': team_att.iloc[0]['goals_per_game'] if not team_att.empty else 0,
+                'Conceded/G': team_def.iloc[0]['goals_conceded_per_game'] if not team_def.empty else 0,
+                'CS%': team_def.iloc[0]['clean_sheet_%'] if not team_def.empty else 0,
+                'Fixtures': team_data['fixtures']
+            })
+        
+        comp_df = pd.DataFrame(comparison_data)
+        
+        st.dataframe(
+            comp_df.style.format({
+                'Avg FDR': '{:.2f}',
+                'Goals/G': '{:.2f}',
+                'Conceded/G': '{:.2f}',
+                'CS%': '{:.1f}%'
+            }).background_gradient(subset=['Avg FDR'], cmap='RdYlGn_r', vmin=1, vmax=5),
+            use_container_width=True,
+            hide_index=True
+        )
+
 def show_detailed_breakdown(detailed_fixtures, team_fixtures):
     """Show detailed fixture breakdown"""
     
@@ -757,8 +758,8 @@ def show_detailed_breakdown(detailed_fixtures, team_fixtures):
                             h_diff = fixture['home_difficulty']
                             a_diff = fixture['away_difficulty']
                             
-                            h_color = get_difficulty_color(h_diff)
-                            a_color = get_difficulty_color(a_diff)
+                            h_color = get_fdr_color(h_diff)
+                            a_color = get_fdr_color(a_diff)
                             
                             st.markdown(f"**{fixture['fixture']}**")
                             
@@ -785,15 +786,6 @@ def show_detailed_breakdown(detailed_fixtures, team_fixtures):
         hide_index=True,
         height=400
     )
-
-def get_difficulty_color(difficulty):
-    """Get color based on difficulty rating"""
-    if difficulty < 2.5:
-        return '#27ae60'  # Green
-    elif difficulty < 3.5:
-        return '#f39c12'  # Orange
-    else:
-        return '#e74c3c'  # Red
 
 # Call the main show function
 show(defensive_df, attacking_df)

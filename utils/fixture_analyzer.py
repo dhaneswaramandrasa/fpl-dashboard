@@ -1,6 +1,7 @@
 """
 Fixture Analysis Utility
 Fetches upcoming fixtures and calculates difficulty ratings
+UPDATED: Skip nearly-complete gameweeks
 """
 
 import requests
@@ -20,6 +21,7 @@ class FixtureAnalyzer:
         self.teams = {}
         self.fixtures = []
         self.current_gw = None
+        self.first_full_gw = None  # First GW where most teams have fixtures
     
     def get_bootstrap_data(self) -> Dict:
         """Fetch main FPL bootstrap data"""
@@ -78,22 +80,63 @@ class FixtureAnalyzer:
         
         return df
     
+    def find_first_full_gameweek(self, fixtures_df: pd.DataFrame) -> int:
+        """
+        Find the first gameweek where at least 75% of teams have unfinished fixtures
+        This skips nearly-complete gameweeks (like GW16 where only 2 teams have fixtures left)
+        """
+        if self.current_gw is None:
+            return None
+        
+        # Check upcoming gameweeks
+        for gw in range(self.current_gw, self.current_gw + 10):
+            gw_fixtures = fixtures_df[
+                (fixtures_df['event'] == gw) &
+                (fixtures_df['finished'] == False)
+            ]
+            
+            # Count unique teams with fixtures in this gameweek
+            teams_with_fixtures = set()
+            for _, fixture in gw_fixtures.iterrows():
+                teams_with_fixtures.add(fixture['team_h'])
+                teams_with_fixtures.add(fixture['team_a'])
+            
+            num_teams = len(teams_with_fixtures)
+            total_teams = len(self.teams)
+            
+            # If at least 75% of teams have fixtures, use this gameweek
+            if num_teams >= (total_teams * 0.75):
+                print(f"First full gameweek: GW{gw} ({num_teams}/{total_teams} teams have fixtures)")
+                return gw
+        
+        # Fallback to current gameweek
+        return self.current_gw
+    
     def get_upcoming_fixtures(self, next_n_gameweeks: int = 5) -> pd.DataFrame:
-        """Get upcoming fixtures for next N gameweeks"""
+        """Get upcoming fixtures for next N gameweeks, starting from first full gameweek"""
         if self.current_gw is None:
             return pd.DataFrame()
         
         fixtures_df = self.get_all_fixtures()
         
-        # Filter for upcoming unfinished fixtures only
+        # Find first gameweek where most teams have fixtures
+        self.first_full_gw = self.find_first_full_gameweek(fixtures_df)
+        
+        if self.first_full_gw is None:
+            self.first_full_gw = self.current_gw
+        
+        # Filter for upcoming unfinished fixtures starting from first full gameweek
         upcoming = fixtures_df[
             (fixtures_df['finished'] == False) &
             (fixtures_df['event'].notna()) &
-            (fixtures_df['event'] >= self.current_gw) &
-            (fixtures_df['event'] < self.current_gw + next_n_gameweeks)
+            (fixtures_df['event'] >= self.first_full_gw) &
+            (fixtures_df['event'] < self.first_full_gw + next_n_gameweeks)
         ].copy()
         
         upcoming = upcoming.sort_values(['event', 'kickoff_time'])
+        
+        print(f"Analyzing GW{self.first_full_gw} to GW{self.first_full_gw + next_n_gameweeks - 1}")
+        print(f"Found {len(upcoming)} fixtures")
         
         return upcoming
     
@@ -310,14 +353,13 @@ def analyze_fixtures(next_n_gameweeks: int = 5,
     Returns dictionary with:
     - team_fixtures: DataFrame with team fixture difficulty rankings
     - detailed_fixtures: DataFrame with individual fixture details
-    - current_gw: Current gameweek number
+    - current_gw: Current/starting gameweek number
     """
     
     analyzer = FixtureAnalyzer()
     analyzer.initialize()
     
     print(f"Current gameweek: {analyzer.current_gw}")
-    print(f"Analyzing next {next_n_gameweeks} gameweeks (GW{analyzer.current_gw} to GW{analyzer.current_gw + next_n_gameweeks - 1})")
     
     # Merge team form data if available
     team_form_df = None
@@ -329,18 +371,20 @@ def analyze_fixtures(next_n_gameweeks: int = 5,
             suffixes=('_def', '_att')
         )
     
-    # Get team fixture analysis
+    # Get team fixture analysis (this will find first full gameweek)
     team_fixtures = analyzer.analyze_team_fixtures(next_n_gameweeks, team_form_df)
-    
-    print(f"Found fixtures for {len(team_fixtures)} teams")
     
     # Get detailed fixture breakdown
     detailed_fixtures = analyzer.get_detailed_fixtures(next_n_gameweeks, team_form_df)
     
+    # Use first_full_gw as the starting point for display
+    starting_gw = analyzer.first_full_gw if analyzer.first_full_gw else analyzer.current_gw
+    
+    print(f"Found fixtures for {len(team_fixtures)} teams")
     print(f"Total individual fixtures: {len(detailed_fixtures)}")
     
     return {
         'team_fixtures': team_fixtures,
         'detailed_fixtures': detailed_fixtures,
-        'current_gw': analyzer.current_gw
+        'current_gw': starting_gw  # Return the starting GW (not current GW)
     }
