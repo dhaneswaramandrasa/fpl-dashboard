@@ -79,7 +79,7 @@ def show(player_data, match_data):
         top_scorer = filtered_df.nlargest(1, 'total_points').iloc[0]
         st.metric(
             "🏆 Top Scorer",
-            top_scorer['full_name'],
+            top_scorer['player_name'],
             f"{top_scorer['total_points']:.0f} pts"
         )
     
@@ -136,7 +136,7 @@ def show_performance_analysis(df):
             y='total_points',
             color='position',
             size='total_minutes',
-            hover_name='full_name',
+            hover_name='player_name',
             hover_data={
                 'total_xGI': ':.2f',
                 'total_points': ':.0f',
@@ -167,7 +167,7 @@ def show_performance_analysis(df):
             y='points_per90_last_5',
             color='position',
             size='minutes_last_5',
-            hover_name='full_name',
+            hover_name='player_name',
             hover_data={
                 'xGI_per90_last_5': ':.2f',
                 'points_per90_last_5': ':.2f',
@@ -193,18 +193,19 @@ def show_performance_analysis(df):
     # Top performers table
     st.subheader("🏆 Top Performers (Season)")
     
-    top_performers = df.nlargest(15, 'total_points')[
-        ['full_name', 'position', 'total_points', 'fixtures_played', 
+    top_performers = df.nlargest(20, 'total_points')[
+        ['player_name', 'player_price','player_team','position', 'total_points', 'total_minutes', 
          'points_per90_season', 'total_xGI', 'xGI_per90_season']
     ].copy()
     
-    top_performers.columns = ['Player', 'Pos', 'Points', 'Games', 'Pts/90', 'xGI', 'xGI/90']
+    top_performers.columns = ['Player', 'Price', 'Team', 'Pos', 'Points', 'Minutes', 'Pts/90', 'xGI', 'xGI/90']
     
     # Style the dataframe
     st.dataframe(
         top_performers.style.format({
             'Points': '{:.0f}',
-            'Games': '{:.0f}',
+            'Price': '{:.1f}',
+            'Minutes': '{:.0f}',
             'Pts/90': '{:.2f}',
             'xGI': '{:.2f}',
             'xGI/90': '{:.2f}'
@@ -224,7 +225,7 @@ def show_form_trends(df, match_data):
     with col1:
         st.markdown("#### 📈 Players in Hot Form")
         hot_players = df[df['hot_form'] == True].nlargest(10, 'form_trend_points')[
-            ['full_name', 'position', 'points_per90_season', 'points_per90_last_5', 
+            ['player_name', 'position', 'points_per90_season', 'points_per90_last_5', 
              'form_trend_points', 'minutes_last_5']
         ].copy()
         
@@ -246,7 +247,7 @@ def show_form_trends(df, match_data):
     with col2:
         st.markdown("#### 📉 Cold Form Players")
         cold_players = df[df['form_trend_points'] < -1.0].nsmallest(10, 'form_trend_points')[
-            ['full_name', 'position', 'points_per90_season', 'points_per90_last_5', 
+            ['player_name', 'position', 'points_per90_season', 'points_per90_last_5', 
              'form_trend_points', 'minutes_last_5']
         ].copy()
         
@@ -291,7 +292,7 @@ def show_form_trends(df, match_data):
     st.markdown("#### ⚡ Top xGI/90 (Last 5 Games)")
     
     top_xgi = df[df['minutes_last_5'] >= 200].nlargest(15, 'xGI_per90_last_5')[
-        ['full_name', 'position', 'xGI_per90_last_5', 'goals_last_5', 
+        ['player_name', 'position', 'xGI_per90_last_5', 'goals_last_5', 
          'assists_last_5', 'points_last_5', 'minutes_last_5']
     ].copy()
     
@@ -322,7 +323,7 @@ def show_value_analysis(df):
     with col1:
         # Over-performers
         over_performers = df[df['total_xG'] > 1].nlargest(15, 'xG_overperformance')[
-            ['full_name', 'position', 'goals_scored', 'total_xG', 'xG_overperformance']
+            ['player_name', 'position', 'goals_scored', 'total_xG', 'xG_overperformance']
         ].copy()
         
         over_performers.columns = ['Player', 'Pos', 'Goals', 'xG', 'Diff']
@@ -341,7 +342,7 @@ def show_value_analysis(df):
     with col2:
         # Under-performers
         under_performers = df[df['total_xG'] > 1].nsmallest(15, 'xG_overperformance')[
-            ['full_name', 'position', 'goals_scored', 'total_xG', 'xG_overperformance']
+            ['player_name', 'position', 'goals_scored', 'total_xG', 'xG_overperformance']
         ].copy()
         
         under_performers.columns = ['Player', 'Pos', 'Goals', 'xG', 'Diff']
@@ -366,7 +367,7 @@ def show_value_analysis(df):
         y='goals_scored',
         color='position',
         size='total_minutes',
-        hover_name='full_name',
+        hover_name='player_name',
         hover_data={
             'total_xG': ':.2f',
             'goals_scored': True,
@@ -409,7 +410,7 @@ def show_value_analysis(df):
     with col1:
         st.markdown("**Best Points/90 (Season)**")
         best_pts_90 = df[df['total_minutes'] >= 450].nlargest(10, 'points_per90_season')[
-            ['full_name', 'position', 'total_points', 'total_minutes', 'points_per90_season']
+            ['player_name', 'position', 'total_points', 'total_minutes', 'points_per90_season']
         ].copy()
         best_pts_90.columns = ['Player', 'Pos', 'Points', 'Minutes', 'Pts/90']
         st.dataframe(
@@ -427,7 +428,7 @@ def show_value_analysis(df):
         best_bonus = df[df['total_minutes'] >= 450].assign(
             bonus_per90=lambda x: x['bonus'] * 90 / x['total_minutes']
         ).nlargest(10, 'bonus_per90')[
-            ['full_name', 'position', 'bonus', 'total_minutes', 'bonus_per90']
+            ['player_name', 'position', 'bonus', 'total_minutes', 'bonus_per90']
         ].copy()
         best_bonus.columns = ['Player', 'Pos', 'Bonus', 'Minutes', 'Bonus/90']
         st.dataframe(
