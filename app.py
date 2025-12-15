@@ -71,7 +71,7 @@ with st.sidebar:
     
     # Navigation
     st.subheader("📍 Navigation")
-    st.page_link("app.py", label="🏠 Home", icon="🏠")
+    st.page_link("app.py", label="Home", icon="🏠")
     st.page_link("pages/1_📈_Overview.py", label="Overview", icon="📈")
     st.page_link("pages/2_👥_Player_Comparison.py", label="Player Comparison", icon="👥")
     st.page_link("pages/3_🏆_Team_Analysis.py", label="Team Analysis", icon="🏆")
@@ -166,22 +166,48 @@ if st.session_state.data_loaded:
     with col1:
         st.markdown("#### 🔥 Top 10 Players in Form")
         hot_players = st.session_state.player_data[st.session_state.player_data['minutes_last_5'] >= 360].nlargest(10, 'points_per90_last_5')[
-            ['player_name', 'player_team','position', 'points_per90_last_5', 'form_trend_points']
+            ['player_name', 'player_price','player_team','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
         ]
-        hot_players.columns = ['Player', 'Team', 'Pos', 'Pts/90 (L5)', 'Form Trend']
+        hot_players.columns = ['Player', 'Price', 'Team', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
         st.dataframe(hot_players, hide_index=True, use_container_width=True)
 
+        st.markdown("#### 🔥 Top 10 Midfielders in Form")
+        hot_players = st.session_state.player_data[(st.session_state.player_data['minutes_last_5'] >= 360) & (st.session_state.player_data['position'] == 'MID')].nlargest(10, 'points_per90_last_5')[
+            ['player_name', 'player_price','player_team','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
+        ]
+        hot_players.columns = ['Player', 'Price', 'Team', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
+        st.dataframe(hot_players, hide_index=True, use_container_width=True)
+
+        st.markdown("#### 🔥 Top 10 Defenders in Form")
+        hot_players = st.session_state.player_data[(st.session_state.player_data['minutes_last_5'] >= 360) & (st.session_state.player_data['position'] == 'DEF')].nlargest(10, 'points_per90_last_5')[
+            ['player_name', 'player_price','player_team','position','points_per90_last_5', 'points_per90_season','form_trend_points','defensive_contribution_per90_season','defensive_contribution_per90_last_5']
+        ]
+        hot_players.columns = ['Player', 'Price', 'Team', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','Defcon/90','Defcon/90 (L5)']
+        st.dataframe(hot_players, hide_index=True, use_container_width=True)
     
     with col2:
         st.markdown("#### ⚡ Top 10 xGI per 90 (L5)")
         top_xgi = st.session_state.player_data[
             st.session_state.player_data['minutes_last_5'] >= 360
         ].nlargest(10, 'xGI_per90_last_5')[
-            ['player_name', 'player_team', 'position', 'xGI_per90_last_5', 'points_last_5']
+            ['player_name', 'player_team', 'position', 'xGI_per90_last_5', 'xGI_per90_season','points_last_5']
         ]
-        top_xgi.columns = ['Player', 'Team', 'Pos', 'xGI/90', 'Points (L5)']
+        top_xgi.columns = ['Player', 'Team', 'Pos', 'xGI/90', 'xGI/90 Season','Points (L5)']
         st.dataframe(top_xgi, hide_index=True, use_container_width=True)
 
+        st.markdown("#### 🔥 Top 10 Forwards in Form")
+        hot_players = st.session_state.player_data[(st.session_state.player_data['minutes_last_5'] >= 250) & (st.session_state.player_data['position'] == 'FWD')].nlargest(10, 'points_per90_last_5')[
+            ['player_name', 'player_price','player_team','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
+        ]
+        hot_players.columns = ['Player', 'Price', 'Team', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
+        st.dataframe(hot_players, hide_index=True, use_container_width=True)
+
+        st.markdown("#### 🔥 Top 10 Goalkeepers in Form")
+        hot_players = st.session_state.player_data[(st.session_state.player_data['minutes_last_5'] >= 360) & (st.session_state.player_data['position'] == 'GKP')].nlargest(10, 'points_per90_last_5')[
+            ['player_name', 'player_price','player_team','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
+        ]
+        hot_players.columns = ['Player', 'Price', 'Team', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
+        st.dataframe(hot_players, hide_index=True, use_container_width=True)
 else:
     # Welcome screen when no data
     col1, col2, col3, col4 = st.columns(4)
