@@ -71,11 +71,12 @@ with st.sidebar:
     
     # Navigation
     st.subheader("📍 Navigation")
-    st.page_link("app.py", label="Home", icon="🏠")
+    st.page_link("app.py", label="🏠 Home", icon="🏠")
     st.page_link("pages/1_📈_Overview.py", label="Overview", icon="📈")
-    st.page_link("pages/2_👥_Player_Comparison.py", label="Player Comparison", icon="👥")
-    st.page_link("pages/3_🏆_Team_Analysis.py", label="Team Analysis", icon="🏆")
-    st.page_link("pages/4_📅_Fixture_Analysis.py", label="Fixture Analysis", icon="📅")
+    st.page_link("pages/2_👤_Player_Detail.py", label="Player Detail", icon="👤")
+    st.page_link("pages/3_👥_Player_Comparison.py", label="Player Comparison", icon="👥")
+    st.page_link("pages/4_🏆_Team_Analysis.py", label="Team Analysis", icon="🏆")
+    st.page_link("pages/5_📅_Fixture_Analysis.py", label="Fixture Analysis", icon="📅")
     
     st.markdown("---")
     
@@ -84,6 +85,7 @@ with st.sidebar:
     st.markdown("""
     This dashboard provides comprehensive FPL analysis including:
     - **Overview**: Top performers and trends
+    - **Player Detail**: Individual player match-by-match stats
     - **Player Comparison**: Compare players head-to-head
     - **Team Analysis**: Attacking/defensive team stats
     - **Fixture Analysis**: Upcoming fixture difficulty rankings
@@ -134,7 +136,7 @@ if st.session_state.data_loaded:
     # Navigation cards
     st.markdown("### 📍 Choose Your Analysis")
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         st.info("📈 **Overview**\n\nTrack top performers, form trends, and key metrics")
@@ -142,19 +144,26 @@ if st.session_state.data_loaded:
             st.switch_page("pages/1_📈_Overview.py")
     
     with col2:
-        st.info("👥 **Player Comparison**\n\nCompare players side-by-side with radar charts")
-        if st.button("Go to Player Comparison →", use_container_width=True):
-            st.switch_page("pages/2_👥_Player_Comparison.py")
+        st.info("👤 **Player Detail**\n\nDetailed match-by-match stats for individual players")
+        if st.button("Go to Player Detail →", use_container_width=True):
+            st.switch_page("pages/2_👤_Player_Detail.py")
     
     with col3:
-        st.info("🏆 **Team Analysis**\n\nAnalyze team attacking and defensive stats")
-        if st.button("Go to Team Analysis →", use_container_width=True):
-            st.switch_page("pages/3_🏆_Team_Analysis.py")
+        st.info("👥 **Player Comparison**\n\nCompare players side-by-side with radar charts")
+        if st.button("Go to Player Comparison →", use_container_width=True):
+            st.switch_page("pages/3_👥_Player_Comparison.py")
+    
+    col4, col5, col6 = st.columns(3)
     
     with col4:
+        st.info("🏆 **Team Analysis**\n\nAnalyze team attacking and defensive stats")
+        if st.button("Go to Team Analysis →", use_container_width=True):
+            st.switch_page("pages/4_🏆_Team_Analysis.py")
+    
+    with col5:
         st.info("📅 **Fixture Analysis**\n\nFind teams with the best upcoming fixtures")
         if st.button("Go to Fixture Analysis →", use_container_width=True):
-            st.switch_page("pages/4_📅_Fixture_Analysis.py")
+            st.switch_page("pages/5_📅_Fixture_Analysis.py")
     
     st.markdown("---")
     
@@ -166,23 +175,23 @@ if st.session_state.data_loaded:
     with col1:
         st.markdown("#### 🔥 Top 10 Players in Form")
         hot_players = st.session_state.player_data[st.session_state.player_data['minutes_last_5'] >= 360].nlargest(10, 'points_per90_last_5')[
-            ['player_name', 'player_price','player_team','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
+            ['player_name', 'price','team_short','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
         ]
-        hot_players.columns = ['Player', 'Price', 'Team', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
+        hot_players.columns = ['Player', 'Price', 'team_short', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
         st.dataframe(hot_players, hide_index=True, use_container_width=True)
 
         st.markdown("#### 🔥 Top 10 Midfielders in Form")
         hot_players = st.session_state.player_data[(st.session_state.player_data['minutes_last_5'] >= 360) & (st.session_state.player_data['position'] == 'MID')].nlargest(10, 'points_per90_last_5')[
-            ['player_name', 'player_price','player_team','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
+            ['player_name', 'price','team_short','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
         ]
-        hot_players.columns = ['Player', 'Price', 'Team', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
+        hot_players.columns = ['Player', 'Price', 'team_short', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
         st.dataframe(hot_players, hide_index=True, use_container_width=True)
 
         st.markdown("#### 🔥 Top 10 Defenders in Form")
         hot_players = st.session_state.player_data[(st.session_state.player_data['minutes_last_5'] >= 360) & (st.session_state.player_data['position'] == 'DEF')].nlargest(10, 'points_per90_last_5')[
-            ['player_name', 'player_price','player_team','position','points_per90_last_5', 'points_per90_season','form_trend_points','defensive_contribution_per90_season','defensive_contribution_per90_last_5']
+            ['player_name', 'price','team_short','position','points_per90_last_5', 'points_per90_season','form_trend_points','defensive_contribution_per90_season','defensive_contribution_per90_last_5']
         ]
-        hot_players.columns = ['Player', 'Price', 'Team', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','Defcon/90','Defcon/90 (L5)']
+        hot_players.columns = ['Player', 'Price', 'team_short', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','Defcon/90','Defcon/90 (L5)']
         st.dataframe(hot_players, hide_index=True, use_container_width=True)
     
     with col2:
@@ -190,38 +199,44 @@ if st.session_state.data_loaded:
         top_xgi = st.session_state.player_data[
             st.session_state.player_data['minutes_last_5'] >= 360
         ].nlargest(10, 'xGI_per90_last_5')[
-            ['player_name', 'player_team', 'position', 'xGI_per90_last_5', 'xGI_per90_season','points_last_5']
+            ['player_name', 'team_short', 'position', 'xGI_per90_last_5', 'xGI_per90_season','points_last_5']
         ]
-        top_xgi.columns = ['Player', 'Team', 'Pos', 'xGI/90', 'xGI/90 Season','Points (L5)']
+        top_xgi.columns = ['Player', 'team_short', 'Pos', 'xGI/90', 'xGI/90 Season','Points (L5)']
         st.dataframe(top_xgi, hide_index=True, use_container_width=True)
 
         st.markdown("#### 🔥 Top 10 Forwards in Form")
         hot_players = st.session_state.player_data[(st.session_state.player_data['minutes_last_5'] >= 250) & (st.session_state.player_data['position'] == 'FWD')].nlargest(10, 'points_per90_last_5')[
-            ['player_name', 'player_price','player_team','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
+            ['player_name', 'price','team_short','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
         ]
-        hot_players.columns = ['Player', 'Price', 'Team', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
+        hot_players.columns = ['Player', 'Price', 'team_short', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
         st.dataframe(hot_players, hide_index=True, use_container_width=True)
 
         st.markdown("#### 🔥 Top 10 Goalkeepers in Form")
         hot_players = st.session_state.player_data[(st.session_state.player_data['minutes_last_5'] >= 360) & (st.session_state.player_data['position'] == 'GKP')].nlargest(10, 'points_per90_last_5')[
-            ['player_name', 'player_price','player_team','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
+            ['player_name', 'price','team_short','position','points_per90_last_5', 'points_per90_season','form_trend_points','xG_overperformance','xA_overperformance']
         ]
-        hot_players.columns = ['Player', 'Price', 'Team', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
+        hot_players.columns = ['Player', 'Price', 'team_short', 'Pos', 'Pts/90 (L5)', 'Pts/90 Season','Form Trend','xG Overperformance','xA Overperformance']
         st.dataframe(hot_players, hide_index=True, use_container_width=True)
+
 else:
     # Welcome screen when no data
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         st.info("📈 **Overview**\n\nTrack top performers, form trends, and key metrics")
     
     with col2:
-        st.info("👥 **Player Comparison**\n\nCompare players side-by-side with radar charts")
+        st.info("👤 **Player Detail**\n\nDetailed match-by-match stats for individual players")
     
     with col3:
-        st.info("🏆 **Team Analysis**\n\nAnalyze team attacking and defensive stats")
+        st.info("👥 **Player Comparison**\n\nCompare players side-by-side with radar charts")
+    
+    col4, col5, col6 = st.columns(3)
     
     with col4:
+        st.info("🏆 **Team Analysis**\n\nAnalyze team attacking and defensive stats")
+    
+    with col5:
         st.info("📅 **Fixture Analysis**\n\nFind teams with best upcoming fixtures")
     
     st.markdown("---")
@@ -231,6 +246,7 @@ else:
     st.markdown("""
     - 🎯 **Real-time FPL Data**: Directly from the official FPL API
     - 📊 **Interactive Visualizations**: Scatter plots, radar charts, and more
+    - 👤 **Player Detail View**: Match-by-match breakdown with color-coded stats
     - 🔥 **Form Analysis**: Rolling metrics for recent performance
     - ⚡ **xG Metrics**: Expected goals and assists
     - 🏠 **Home/Away Splits**: Detailed venue-based statistics

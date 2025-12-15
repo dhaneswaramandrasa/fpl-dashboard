@@ -194,7 +194,7 @@ def show_performance_analysis(df):
     st.subheader("🏆 Top Performers (Season)")
     
     top_performers = df.nlargest(20, 'total_points')[
-        ['player_name', 'player_price','player_team','position', 'total_points', 'total_minutes', 
+        ['player_name', 'price','team_short','position', 'total_points', 'total_minutes', 
          'points_per90_season', 'total_xGI', 'xGI_per90_season']
     ].copy()
     

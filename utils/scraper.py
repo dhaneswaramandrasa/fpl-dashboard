@@ -456,7 +456,9 @@ class ComprehensiveFPLScraper:
             away_stats['def_contrib_away'] * 90 / away_stats['minutes_away'],
             0
         )
-        
+        cols_to_drop = ['player_price', 'player_name', 'player_team', 'position']
+        home_stats = home_stats.drop(columns=[col for col in cols_to_drop if col in home_stats.columns])
+        away_stats = away_stats.drop(columns=[col for col in cols_to_drop if col in away_stats.columns])
         return home_stats, away_stats
     
     def aggregate_player_stats(self, df):
@@ -487,7 +489,7 @@ class ComprehensiveFPLScraper:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         season_agg = (
-            df.groupby(['full_name','player_price','player_name','player_team', 'position'], as_index=False)
+            df.groupby(['full_name', 'player_name', 'player_team', 'player_team_short', 'position', 'player_price'], as_index=False)
             .agg({
                 'round': 'count',
                 'starts': 'sum',
@@ -549,10 +551,21 @@ class ComprehensiveFPLScraper:
                 'recoveries': 'total_recoveries'
             })
         )
-        
         # Merge home/away stats
         season_agg = season_agg.merge(home_stats, on='full_name', how='left')
         season_agg = season_agg.merge(away_stats, on='full_name', how='left')
+        
+        # ========== ADD THESE LINES AFTER MERGING HOME/AWAY STATS ==========
+        # Rename columns to match what Player Detail page expects
+        if 'player_team' in season_agg.columns:
+            season_agg = season_agg.rename(columns={'player_team': 'team'})
+        
+        if 'player_team_short' in season_agg.columns:
+            season_agg = season_agg.rename(columns={'player_team_short': 'team_short'})
+        
+        if 'player_price' in season_agg.columns:
+            season_agg = season_agg.rename(columns={'player_price': 'price'})
+        # ========== END OF RENAME SECTION ==========
         
         # Fill NaN in home/away stats with 0
         home_away_cols = [col for col in season_agg.columns if '_home' in col or '_away' in col]
@@ -561,6 +574,10 @@ class ComprehensiveFPLScraper:
         # Ensure all numeric
         for col in season_agg.select_dtypes(include=['number']).columns:
             season_agg[col] = pd.to_numeric(season_agg[col], errors='coerce').fillna(0)
+        
+        # Also make sure price is numeric
+        if 'price' in season_agg.columns:
+            season_agg['price'] = pd.to_numeric(season_agg['price'], errors='coerce').fillna(0)
         
         # === SEASON-WIDE PER 90 CALCULATIONS ===
 
