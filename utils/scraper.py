@@ -273,6 +273,12 @@ class ComprehensiveFPLScraper:
                     group[f'starts_last_{window}'] = group['starts'].rolling(window, min_periods=1).sum()
                 
                 # Per 90 metrics
+                group[f'defensive_contribution_per90_last_{window}'] = np.where(
+                    group[f'minutes_last_{window}'] > 0,
+                    group[f'defensive_contribution_last_{window}'] * 90 / group[f'minutes_last_{window}'],
+                    0
+                )
+
                 group[f'xGI_per90_last_{window}'] = np.where(
                     group[f'minutes_last_{window}'] > 0,
                     group[f'xGI_last_{window}'] * 90 / group[f'minutes_last_{window}'],
@@ -308,7 +314,7 @@ class ComprehensiveFPLScraper:
             return group
         
         df = df.sort_values(['full_name', 'round']).reset_index(drop=True)
-        df = df.groupby(['full_name','player_name','player_team','position'], group_keys=False).apply(calc_rolling)
+        df = df.groupby(['full_name','player_price','player_name','player_team','position'], group_keys=False).apply(calc_rolling)
         return df
     
     def calculate_home_away_splits(self, df):
@@ -319,7 +325,7 @@ class ComprehensiveFPLScraper:
         away_df = df[df['venue'] == 'Away'].copy()
         
         # Group by player
-        home_stats = home_df.groupby(['full_name','player_name','player_team','position'], as_index=False).agg({
+        home_stats = home_df.groupby(['full_name','player_price','player_name','player_team','position'], as_index=False).agg({
             'minutes': 'sum',
             'total_points': 'sum',
             'goals_scored': 'sum',
@@ -353,7 +359,7 @@ class ComprehensiveFPLScraper:
             'round': 'games_home'
         })
         
-        away_stats = away_df.groupby(['full_name','player_name','player_team','position'], as_index=False).agg({
+        away_stats = away_df.groupby(['full_name','player_price','player_name','player_team','position'], as_index=False).agg({
             'minutes': 'sum',
             'total_points': 'sum',
             'goals_scored': 'sum',
@@ -472,7 +478,7 @@ class ComprehensiveFPLScraper:
             'npxGI_last_5', 'npxGI_per90_last_5',
             'bps_last_5', 'bps_per90_last_5',
             'bonus_last_5', 'bonus_per90_last_5',
-            'defensive_contribution_last_5', 'tackles_last_5',
+            'defensive_contribution_last_5','defensive_contribution_per90_last_5', 'tackles_last_5',
             'starts_last_5'
         ]
         
@@ -481,7 +487,7 @@ class ComprehensiveFPLScraper:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
         season_agg = (
-            df.groupby(['full_name','player_name','player_team', 'position'], as_index=False)
+            df.groupby(['full_name','player_price','player_name','player_team', 'position'], as_index=False)
             .agg({
                 'round': 'count',
                 'starts': 'sum',
@@ -521,6 +527,7 @@ class ComprehensiveFPLScraper:
                 'bonus_last_5': 'last',
                 'bonus_per90_last_5': 'last',
                 'defensive_contribution_last_5': 'last',
+                'defensive_contribution_per90_last_5': 'last',
                 'tackles_last_5': 'last',
                 'starts_last_5': 'last'
             })
@@ -556,6 +563,7 @@ class ComprehensiveFPLScraper:
             season_agg[col] = pd.to_numeric(season_agg[col], errors='coerce').fillna(0)
         
         # === SEASON-WIDE PER 90 CALCULATIONS ===
+
         season_agg['xGI_per90_season'] = np.where(
             season_agg['total_minutes'] > 0,
             season_agg['total_xGI'] * 90 / season_agg['total_minutes'],
