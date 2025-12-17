@@ -702,48 +702,246 @@ def show_player_overview(player_info, recent_matches):
     
     # === NEW: Additional Per 90 Metrics ===
     st.markdown("---")
-    st.markdown("#### 📊 Detailed Per 90 Metrics")
+    st.markdown("#### 📊 Detailed Per 90 Metrics (Season)")
     
     # Get total_minutes once for all calculations
     total_minutes = player_info.get('total_minutes', 0)
+    player_position = player_info.get('position', 'MID')
+    
+    # Minimum minutes threshold for rankings (10 full games)
+    MIN_MINUTES_SEASON = 900
+    player_qualifies = total_minutes >= MIN_MINUTES_SEASON
+    
+    # Get all players for ranking (filter for players with significant minutes)
+    all_players = st.session_state.player_data
+    qualified_players = all_players[all_players['total_minutes'] >= MIN_MINUTES_SEASON]
+    qualified_same_position = qualified_players[qualified_players['position'] == player_position]
+    
+    def get_rank(value, all_values, ascending=False):
+        """Calculate rank of a value among all values"""
+        if ascending:
+            # Lower is better (e.g., price)
+            rank = (all_values < value).sum() + 1
+        else:
+            # Higher is better (most metrics)
+            rank = (all_values > value).sum() + 1
+        return rank
+    
+    def format_rank(rank, total):
+        """Format rank as ordinal (1st, 2nd, 3rd, etc.)"""
+        if rank == 1:
+            suffix = "st"
+        elif rank == 2:
+            suffix = "nd"
+        elif rank == 3:
+            suffix = "rd"
+        else:
+            suffix = "th"
+        return f"{rank}{suffix}"
+    
+    def format_double_rank(overall_rank, overall_total, pos_rank, pos_total, position):
+        """Format both overall and position ranks"""
+        overall_str = format_rank(overall_rank, overall_total)
+        pos_str = format_rank(pos_rank, pos_total)
+        return f"({overall_str} | {pos_str} {position})"
+    
+    # Add info message if player doesn't qualify for rankings
+    if not player_qualifies:
+        st.info(f"ℹ️ Rankings require {MIN_MINUTES_SEASON}+ minutes (≈10 games). This player has {total_minutes} minutes.")
     
     col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
     
     with col1:
-        st.metric("Pts/90", f"{player_info.get('points_per90_season', 0):.2f}")
+        pts_per90 = player_info.get('points_per90_season', 0)
+        if player_qualifies:
+            overall_rank = get_rank(pts_per90, qualified_players['points_per90_season'])
+            pos_rank = get_rank(pts_per90, qualified_same_position['points_per90_season'])
+            rank_str = format_double_rank(overall_rank, len(qualified_players), pos_rank, len(qualified_same_position), player_position)
+            st.metric("Pts/90", f"{pts_per90:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("Pts/90", f"{pts_per90:.2f}", delta="(Not ranked)", delta_color="off")
     
     with col2:
+        # Calculate goals per 90 season
+        total_goals = player_info.get('goals_scored', 0)
+        goals_per90 = (total_goals * 90 / total_minutes) if total_minutes > 0 else 0
+        if player_qualifies:
+            qualified_players_copy = qualified_players.copy()
+            qualified_players_copy['goals_per90_calc'] = (qualified_players_copy['goals_scored'] * 90 / qualified_players_copy['total_minutes'])
+            qualified_same_pos_copy = qualified_same_position.copy()
+            qualified_same_pos_copy['goals_per90_calc'] = (qualified_same_pos_copy['goals_scored'] * 90 / qualified_same_pos_copy['total_minutes'])
+            overall_rank = get_rank(goals_per90, qualified_players_copy['goals_per90_calc'])
+            pos_rank = get_rank(goals_per90, qualified_same_pos_copy['goals_per90_calc'])
+            rank_str = format_double_rank(overall_rank, len(qualified_players), pos_rank, len(qualified_same_position), player_position)
+            st.metric("G/90", f"{goals_per90:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("G/90", f"{goals_per90:.2f}", delta="(Not ranked)", delta_color="off")
+    
+    with col3:
+        # Calculate assists per 90 season
+        total_assists = player_info.get('assists', 0)
+        assists_per90 = (total_assists * 90 / total_minutes) if total_minutes > 0 else 0
+        if player_qualifies:
+            qualified_players_copy['assists_per90_calc'] = (qualified_players_copy['assists'] * 90 / qualified_players_copy['total_minutes'])
+            qualified_same_pos_copy['assists_per90_calc'] = (qualified_same_pos_copy['assists'] * 90 / qualified_same_pos_copy['total_minutes'])
+            overall_rank = get_rank(assists_per90, qualified_players_copy['assists_per90_calc'])
+            pos_rank = get_rank(assists_per90, qualified_same_pos_copy['assists_per90_calc'])
+            rank_str = format_double_rank(overall_rank, len(qualified_players), pos_rank, len(qualified_same_position), player_position)
+            st.metric("A/90", f"{assists_per90:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("A/90", f"{assists_per90:.2f}", delta="(Not ranked)", delta_color="off")
+    
+    with col4:
         # Calculate xG/90 from total_xG
         total_xg = player_info.get('total_xG', 0)
         xg_per90 = (total_xg * 90 / total_minutes) if total_minutes > 0 else 0
-        st.metric("xG/90", f"{xg_per90:.2f}")
-    
-    with col3:
-        # Calculate npXG/90 if available
-        total_npxg = player_info.get('total_npxG', 0)
-        npxg_per90 = (total_npxg * 90 / total_minutes) if total_minutes > 0 else 0
-        st.metric("npXG/90", f"{npxg_per90:.2f}")
-    
-    with col4:
-        st.metric("xGI/90", f"{player_info.get('xGI_per90_season', 0):.2f}")
+        if player_qualifies:
+            qualified_players_copy['xg_per90_calc'] = (qualified_players_copy['total_xG'] * 90 / qualified_players_copy['total_minutes'])
+            qualified_same_pos_copy['xg_per90_calc'] = (qualified_same_pos_copy['total_xG'] * 90 / qualified_same_pos_copy['total_minutes'])
+            overall_rank = get_rank(xg_per90, qualified_players_copy['xg_per90_calc'])
+            pos_rank = get_rank(xg_per90, qualified_same_pos_copy['xg_per90_calc'])
+            rank_str = format_double_rank(overall_rank, len(qualified_players), pos_rank, len(qualified_same_position), player_position)
+            st.metric("xG/90", f"{xg_per90:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("xG/90", f"{xg_per90:.2f}", delta="(Not ranked)", delta_color="off")
     
     with col5:
         # Calculate xA/90
         total_xa = player_info.get('total_xA', 0)
         xa_per90 = (total_xa * 90 / total_minutes) if total_minutes > 0 else 0
-        st.metric("xA/90", f"{xa_per90:.2f}")
+        if player_qualifies:
+            qualified_players_copy['xa_per90_calc'] = (qualified_players_copy['total_xA'] * 90 / qualified_players_copy['total_minutes'])
+            qualified_same_pos_copy['xa_per90_calc'] = (qualified_same_pos_copy['total_xA'] * 90 / qualified_same_pos_copy['total_minutes'])
+            overall_rank = get_rank(xa_per90, qualified_players_copy['xa_per90_calc'])
+            pos_rank = get_rank(xa_per90, qualified_same_pos_copy['xa_per90_calc'])
+            rank_str = format_double_rank(overall_rank, len(qualified_players), pos_rank, len(qualified_same_position), player_position)
+            st.metric("xA/90", f"{xa_per90:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("xA/90", f"{xa_per90:.2f}", delta="(Not ranked)", delta_color="off")
     
     with col6:
-        # Calculate DC/90
-        total_dc = player_info.get('total_defensive_contribution', 0)
-        dc_per90 = (total_dc * 90 / total_minutes) if total_minutes > 0 else 0
-        st.metric("DC/90", f"{dc_per90:.2f}")
+        xgi_per90 = player_info.get('xGI_per90_season', 0)
+        if player_qualifies:
+            overall_rank = get_rank(xgi_per90, qualified_players['xGI_per90_season'])
+            pos_rank = get_rank(xgi_per90, qualified_same_position['xGI_per90_season'])
+            rank_str = format_double_rank(overall_rank, len(qualified_players), pos_rank, len(qualified_same_position), player_position)
+            st.metric("xGI/90", f"{xgi_per90:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("xGI/90", f"{xgi_per90:.2f}", delta="(Not ranked)", delta_color="off")
     
     with col7:
-        # Minutes per start
-        total_starts = player_info.get('starts', 0)
-        mins_per_start = total_minutes / total_starts if total_starts > 0 else 0
-        st.metric("Mins/Start", f"{mins_per_start:.0f}")
+        # BPS per 90 season - calculate from player's match data
+        bps_per90 = player_info.get('bps_per90_season', 0)
+        if player_qualifies:
+            overall_rank = get_rank(bps_per90, qualified_players['bps_per90_season'])
+            pos_rank = get_rank(bps_per90, qualified_same_position['bps_per90_season'])
+            rank_str = format_double_rank(overall_rank, len(qualified_players), pos_rank, len(qualified_same_position), player_position)
+            st.metric("BPS/90", f"{bps_per90:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("BPS/90", f"{bps_per90:.2f}", delta="(Not ranked)", delta_color="off")
+    
+    # === NEW: Last 5 Games Per 90 Metrics (SAME AS SEASON) ===
+    st.markdown("---")
+    st.markdown("#### 📊 Detailed Per 90 Metrics (Last 5 Games)")
+    
+    # Minimum minutes threshold for Last 5 rankings (2 full games)
+    MIN_MINUTES_LAST_5 = 180
+    minutes_l5 = player_info.get('minutes_last_5', 0)
+    player_qualifies_l5 = minutes_l5 >= MIN_MINUTES_LAST_5
+    
+    # Filter qualified players who have played in last 5 games
+    qualified_l5 = all_players[all_players['minutes_last_5'] >= MIN_MINUTES_LAST_5]
+    qualified_same_position_l5 = qualified_l5[qualified_l5['position'] == player_position]
+    
+    # Add info message if player doesn't qualify for Last 5 rankings
+    if not player_qualifies_l5:
+        st.info(f"ℹ️ Last 5 rankings require {MIN_MINUTES_LAST_5}+ minutes (≈2 games). This player has {minutes_l5} minutes in last 5.")
+    
+    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+    
+    with col1:
+        pts_per90_l5 = player_info.get('points_per90_last_5', 0)
+        if player_qualifies_l5:
+            overall_rank = get_rank(pts_per90_l5, qualified_l5['points_per90_last_5'])
+            pos_rank = get_rank(pts_per90_l5, qualified_same_position_l5['points_per90_last_5'])
+            rank_str = format_double_rank(overall_rank, len(qualified_l5), pos_rank, len(qualified_same_position_l5), player_position)
+            st.metric("Pts/90", f"{pts_per90_l5:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("Pts/90", f"{pts_per90_l5:.2f}", delta="(Not ranked)", delta_color="off")
+    
+    with col2:
+        # Calculate goals per 90 last 5
+        goals_l5 = player_info.get('goals_last_5', 0)
+        goals_per90_l5 = (goals_l5 * 90 / minutes_l5) if minutes_l5 > 0 else 0
+        if player_qualifies_l5:
+            qualified_l5_copy = qualified_l5.copy()
+            qualified_l5_copy['goals_per90_l5_calc'] = (qualified_l5_copy['goals_last_5'] * 90 / qualified_l5_copy['minutes_last_5'])
+            qualified_same_pos_l5_copy = qualified_same_position_l5.copy()
+            qualified_same_pos_l5_copy['goals_per90_l5_calc'] = (qualified_same_pos_l5_copy['goals_last_5'] * 90 / qualified_same_pos_l5_copy['minutes_last_5'])
+            overall_rank = get_rank(goals_per90_l5, qualified_l5_copy['goals_per90_l5_calc'])
+            pos_rank = get_rank(goals_per90_l5, qualified_same_pos_l5_copy['goals_per90_l5_calc'])
+            rank_str = format_double_rank(overall_rank, len(qualified_l5), pos_rank, len(qualified_same_position_l5), player_position)
+            st.metric("G/90", f"{goals_per90_l5:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("G/90", f"{goals_per90_l5:.2f}", delta="(Not ranked)", delta_color="off")
+    
+    with col3:
+        # Calculate assists per 90 last 5
+        assists_l5 = player_info.get('assists_last_5', 0)
+        assists_per90_l5 = (assists_l5 * 90 / minutes_l5) if minutes_l5 > 0 else 0
+        if player_qualifies_l5:
+            qualified_l5_copy['assists_per90_l5_calc'] = (qualified_l5_copy['assists_last_5'] * 90 / qualified_l5_copy['minutes_last_5'])
+            qualified_same_pos_l5_copy['assists_per90_l5_calc'] = (qualified_same_pos_l5_copy['assists_last_5'] * 90 / qualified_same_pos_l5_copy['minutes_last_5'])
+            overall_rank = get_rank(assists_per90_l5, qualified_l5_copy['assists_per90_l5_calc'])
+            pos_rank = get_rank(assists_per90_l5, qualified_same_pos_l5_copy['assists_per90_l5_calc'])
+            rank_str = format_double_rank(overall_rank, len(qualified_l5), pos_rank, len(qualified_same_position_l5), player_position)
+            st.metric("A/90", f"{assists_per90_l5:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("A/90", f"{assists_per90_l5:.2f}", delta="(Not ranked)", delta_color="off")
+    
+    with col4:
+        xg_per90_l5 = player_info.get('xG_per90_last_5', 0)
+        if player_qualifies_l5:
+            overall_rank = get_rank(xg_per90_l5, qualified_l5['xG_per90_last_5'])
+            pos_rank = get_rank(xg_per90_l5, qualified_same_position_l5['xG_per90_last_5'])
+            rank_str = format_double_rank(overall_rank, len(qualified_l5), pos_rank, len(qualified_same_position_l5), player_position)
+            st.metric("xG/90", f"{xg_per90_l5:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("xG/90", f"{xg_per90_l5:.2f}", delta="(Not ranked)", delta_color="off")
+    
+    with col5:
+        xa_per90_l5 = player_info.get('xA_per90_last_5', 0)
+        if player_qualifies_l5:
+            overall_rank = get_rank(xa_per90_l5, qualified_l5['xA_per90_last_5'])
+            pos_rank = get_rank(xa_per90_l5, qualified_same_position_l5['xA_per90_last_5'])
+            rank_str = format_double_rank(overall_rank, len(qualified_l5), pos_rank, len(qualified_same_position_l5), player_position)
+            st.metric("xA/90", f"{xa_per90_l5:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("xA/90", f"{xa_per90_l5:.2f}", delta="(Not ranked)", delta_color="off")
+    
+    with col6:
+        xgi_per90_l5 = player_info.get('xGI_per90_last_5', 0)
+        if player_qualifies_l5:
+            overall_rank = get_rank(xgi_per90_l5, qualified_l5['xGI_per90_last_5'])
+            pos_rank = get_rank(xgi_per90_l5, qualified_same_position_l5['xGI_per90_last_5'])
+            rank_str = format_double_rank(overall_rank, len(qualified_l5), pos_rank, len(qualified_same_position_l5), player_position)
+            st.metric("xGI/90", f"{xgi_per90_l5:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("xGI/90", f"{xgi_per90_l5:.2f}", delta="(Not ranked)", delta_color="off")
+    
+    with col7:
+        # BPS per 90 last 5
+        bps_l5 = player_info.get('bps_last_5', 0)
+        bps_per90_l5 = (bps_l5 * 90 / minutes_l5) if minutes_l5 > 0 else 0
+        if player_qualifies_l5:
+            qualified_l5_copy['bps_per90_l5_calc'] = (qualified_l5_copy['bps_last_5'] * 90 / qualified_l5_copy['minutes_last_5'])
+            qualified_same_pos_l5_copy['bps_per90_l5_calc'] = (qualified_same_pos_l5_copy['bps_last_5'] * 90 / qualified_same_pos_l5_copy['minutes_last_5'])
+            overall_rank = get_rank(bps_per90_l5, qualified_l5_copy['bps_per90_l5_calc'])
+            pos_rank = get_rank(bps_per90_l5, qualified_same_pos_l5_copy['bps_per90_l5_calc'])
+            rank_str = format_double_rank(overall_rank, len(qualified_l5), pos_rank, len(qualified_same_position_l5), player_position)
+            st.metric("BPS/90", f"{bps_per90_l5:.2f}", delta=rank_str, delta_color="off")
+        else:
+            st.metric("BPS/90", f"{bps_per90_l5:.2f}", delta="(Not ranked)", delta_color="off")
     
     # Add DC Hit % as a separate metric row
     if not recent_matches.empty:

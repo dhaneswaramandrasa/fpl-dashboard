@@ -279,6 +279,18 @@ class ComprehensiveFPLScraper:
                     0
                 )
 
+                group[f'xG_per90_last_{window}'] = np.where(
+                    group[f'minutes_last_{window}'] > 0,
+                    group[f'xG_last_{window}'] * 90 / group[f'minutes_last_{window}'],
+                    0
+                )
+
+                group[f'xA_per90_last_{window}'] = np.where(
+                    group[f'minutes_last_{window}'] > 0,
+                    group[f'xA_last_{window}'] * 90 / group[f'minutes_last_{window}'],
+                    0
+                )
+
                 group[f'xGI_per90_last_{window}'] = np.where(
                     group[f'minutes_last_{window}'] > 0,
                     group[f'xGI_last_{window}'] * 90 / group[f'minutes_last_{window}'],
@@ -476,12 +488,12 @@ class ComprehensiveFPLScraper:
             'influence', 'creativity', 'threat',
             'defensive_contribution', 'tackles', 'clearances_blocks_interceptions', 'recoveries',
             'xGI_last_5', 'points_last_5', 'goals_last_5', 'assists_last_5',
-            'minutes_last_5', 'xGI_per90_last_5', 'points_per90_last_5',
+            'minutes_last_5', 'xG_per90_last_5', 'xA_per90_last_5', 'xGI_per90_last_5', 'points_per90_last_5',
             'npxGI_last_5', 'npxGI_per90_last_5',
             'bps_last_5', 'bps_per90_last_5',
             'bonus_last_5', 'bonus_per90_last_5',
             'defensive_contribution_last_5','defensive_contribution_per90_last_5', 'tackles_last_5',
-            'starts_last_5'
+            'starts_last_5','xG_last_5', 'xA_last_5'
         ]
         
         for col in numeric_cols:
@@ -531,7 +543,11 @@ class ComprehensiveFPLScraper:
                 'defensive_contribution_last_5': 'last',
                 'defensive_contribution_per90_last_5': 'last',
                 'tackles_last_5': 'last',
-                'starts_last_5': 'last'
+                'starts_last_5': 'last',
+                'xG_last_5': 'last',
+                'xA_last_5': 'last',
+                'xG_per90_last_5': 'last',
+                'xA_per90_last_5': 'last'
             })
             .rename(columns={
                 'round': 'fixtures_played',
@@ -580,6 +596,17 @@ class ComprehensiveFPLScraper:
             season_agg['price'] = pd.to_numeric(season_agg['price'], errors='coerce').fillna(0)
         
         # === SEASON-WIDE PER 90 CALCULATIONS ===
+
+        season_agg['xG_per90_season'] = np.where(
+            season_agg['total_minutes'] > 0,
+            season_agg['total_xG'] * 90 / season_agg['total_minutes'],
+            0
+        )
+        season_agg['xA_per90_season'] = np.where(
+            season_agg['total_minutes'] > 0,
+            season_agg['total_xA'] * 90 / season_agg['total_minutes'],
+            0
+        )
 
         season_agg['xGI_per90_season'] = np.where(
             season_agg['total_minutes'] > 0,
