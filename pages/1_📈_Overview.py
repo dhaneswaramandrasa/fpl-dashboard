@@ -72,6 +72,13 @@ def show(player_data, match_data):
         filtered_df = filtered_df[filtered_df['position'] == selected_position]
     filtered_df = filtered_df[filtered_df['total_minutes'] >= min_minutes]
     
+    # Create hot_form flag if it doesn't exist
+    if 'hot_form' not in filtered_df.columns:
+        filtered_df['hot_form'] = (
+            (filtered_df['form_trend_points'] > 1.0) & 
+            (filtered_df['minutes_last_5'] >= 270)
+        )
+    
     # Key metrics at the top
     col1, col2, col3, col4 = st.columns(4)
     
@@ -122,114 +129,392 @@ def show(player_data, match_data):
         show_value_analysis(filtered_df)
 
 def show_performance_analysis(df):
-    """Show performance scatter plots"""
+    """Show performance scatter plots and top performers"""
     
-    st.subheader("Performance Scatter Plots")
+    st.subheader("🎯 Performance Analysis")
     
-    col1, col2 = st.columns(2)
+    # Performance scatter plot
+    col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Points vs xGI
-        fig1 = px.scatter(
+        st.markdown("#### Total Points vs Expected Goal Involvements")
+        
+        fig = px.scatter(
             df,
             x='total_xGI',
             y='total_points',
-            color='position',
             size='total_minutes',
-            hover_name='player_name',
-            hover_data={
-                'total_xGI': ':.2f',
-                'total_points': ':.0f',
-                'fixtures_played': True,
-                'total_minutes': True
-            },
-            title='Total Points vs Expected Goal Involvements (xGI)',
+            color='position',
+            hover_data=['player_name', 'price', 'team_short', 'points_per90_season'],
             labels={
                 'total_xGI': 'Expected Goal Involvements (xGI)',
-                'total_points': 'Total FPL Points',
+                'total_points': 'Total Points',
+                'total_minutes': 'Minutes',
+                'price': 'Price',
                 'position': 'Position'
             },
             color_discrete_map={
                 'FWD': '#e74c3c',
-                'MID': '#3498db',
+                'MID': '#3498db', 
                 'DEF': '#2ecc71',
-                'GK': '#f39c12'
+                'GKP': '#f39c12'
             }
         )
-        fig1.update_layout(height=500)
-        st.plotly_chart(fig1, use_container_width=True)
+        
+        fig.update_traces(marker=dict(line=dict(width=1, color='white')))
+        fig.update_layout(height=500)
+        st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        # Points per 90 vs xGI per 90 (recent form)
-        fig2 = px.scatter(
-            df,
-            x='xGI_per90_last_5',
-            y='points_per90_last_5',
-            color='position',
-            size='minutes_last_5',
-            hover_name='player_name',
-            hover_data={
-                'xGI_per90_last_5': ':.2f',
-                'points_per90_last_5': ':.2f',
-                'points_last_5': ':.0f',
-                'minutes_last_5': ':.0f'
-            },
-            title='Recent Form: Points/90 vs xGI/90 (Last 5 Games)',
-            labels={
-                'xGI_per90_last_5': 'xGI per 90 (Last 5)',
-                'points_per90_last_5': 'Points per 90 (Last 5)',
-                'position': 'Position'
-            },
-            color_discrete_map={
-                'FWD': '#e74c3c',
-                'MID': '#3498db',
-                'DEF': '#2ecc71',
-                'GK': '#f39c12'
-            }
-        )
-        fig2.update_layout(height=500)
-        st.plotly_chart(fig2, use_container_width=True)
+        st.markdown("#### Recent Form (Last 5 Games)")
+        
+        # Filter for players with minutes in last 5 games
+        recent_df = df[df['minutes_last_5'] >= 90].copy()
+        
+        if len(recent_df) > 0:
+            fig2 = px.scatter(
+                recent_df,
+                x='xGI_per90_last_5',
+                y='points_per90_last_5',
+                size='minutes_last_5',
+                color='position',
+                hover_data=['player_name', 'price', 'team_short'],
+                labels={
+                    'xGI_per90_last_5': 'xGI/90',
+                    'points_per90_last_5': 'Points/90',
+                    'minutes_last_5': 'Minutes L5'
+                },
+                color_discrete_map={
+                    'FWD': '#e74c3c',
+                    'MID': '#3498db',
+                    'DEF': '#2ecc71',
+                    'GKP': '#f39c12'
+                }
+            )
+            fig2.update_traces(marker=dict(line=dict(width=1, color='white')))
+            fig2.update_layout(height=500)
+            st.plotly_chart(fig2, use_container_width=True)
+        else:
+            st.info("Not enough data for recent form analysis")
     
-    # Top performers table
+    # Top performers table with added per 90 metrics
     st.subheader("🏆 Top Performers (Season)")
     
-    top_performers = df.nlargest(20, 'total_points')[
-        ['player_name', 'price','team_short','position', 'total_points', 'total_minutes', 
-         'points_per90_season', 'total_xGI', 'xGI_per90_season']
-    ].copy()
+    # Make a copy to avoid modifying original
+    df_copy = df.copy()
     
-    top_performers.columns = ['Player', 'Price', 'Team', 'Pos', 'Points', 'Minutes', 'Pts/90', 'xGI', 'xGI/90']
+    # Calculate xG/90 season if not already present
+    if 'xG_per90_season' not in df_copy.columns:
+        df_copy['xG_per90_season'] = np.where(
+            df_copy['total_minutes'] > 0,
+            (df_copy['total_xG'] * 90 / df_copy['total_minutes']),
+            0
+        )
+    
+    # Check which columns we have available
+    base_cols = ['player_name', 'price', 'team_short', 'position', 'total_points', 'total_minutes', 
+                 'points_per90_season', 'total_xGI', 'xGI_per90_season']
+    optional_cols = []
+    col_names = ['Player', 'Price', 'Team', 'Pos', 'Points', 'Minutes', 'Pts/90', 'xGI', 'xGI/90']
+    format_dict = {
+        'Points': '{:.0f}',
+        'Price': '{:.1f}',
+        'Minutes': '{:.0f}',
+        'Pts/90': '{:.2f}',
+        'xGI': '{:.2f}',
+        'xGI/90': '{:.2f}'
+    }
+    
+    # Add xG/90 season
+    if 'xG_per90_season' in df_copy.columns:
+        optional_cols.append('xG_per90_season')
+        col_names.append('xG/90')
+        format_dict['xG/90'] = '{:.2f}'
+    
+    # Add xG/90 last 5
+    if 'xG_per90_last_5' in df_copy.columns:
+        optional_cols.append('xG_per90_last_5')
+        col_names.append('xG/90 L5')
+        format_dict['xG/90 L5'] = '{:.2f}'
+    
+    # Add xGI/90 last 5
+    if 'xGI_per90_last_5' in df_copy.columns:
+        optional_cols.append('xGI_per90_last_5')
+        col_names.append('xGI/90 L5')
+        format_dict['xGI/90 L5'] = '{:.2f}'
+    
+    # Select columns for display
+    all_cols = base_cols + optional_cols
+    top_performers = df_copy.nlargest(20, 'total_points')[all_cols].copy()
+    
+    # Rename columns for display
+    top_performers.columns = col_names
     
     # Style the dataframe
     st.dataframe(
-        top_performers.style.format({
-            'Points': '{:.0f}',
-            'Price': '{:.1f}',
-            'Minutes': '{:.0f}',
-            'Pts/90': '{:.2f}',
-            'xGI': '{:.2f}',
-            'xGI/90': '{:.2f}'
-        }).background_gradient(subset=['Points'], cmap='YlGn'),
+        top_performers.style.format(format_dict).background_gradient(subset=['Points'], cmap='YlGn'),
         use_container_width=True,
         hide_index=True
     )
+    
+    # === NEW: Flexible Leaderboard Table ===
+    st.markdown("---")
+    st.subheader("📊 Custom Leaderboard - Top 20 by Metric")
+    
+    # Use original player_data for dropdown options (not filtered_df)
+    all_data = player_data.copy()
+    
+    # Create filters in columns
+    filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
+    
+    with filter_col1:
+        # Metric selector
+        metric_options = {
+            'xGI/90 (Season)': 'xGI_per90_season',
+            'xG/90 (Season)': 'xG_per90_season',
+            'Points/90 (Season)': 'points_per90_season',
+            'xGI/90 (Last 5)': 'xGI_per90_last_5',
+            'xG/90 (Last 5)': 'xG_per90_last_5',
+            'xA/90 (Last 5)': 'xA_per90_last_5',
+            'Points/90 (Last 5)': 'points_per90_last_5',
+            'BPS/90 (Season)': 'bps_per90_season',
+            'Bonus/90 (Season)': 'bonus_per90_season',
+            'Defensive Contrib/90': 'defensive_contribution_per90_season'
+        }
+        
+        # Filter to only show metrics that exist in the data
+        available_metrics = {k: v for k, v in metric_options.items() if v in all_data.columns}
+        
+        if not available_metrics:
+            st.warning("No per 90 metrics available in data")
+            return
+        
+        sort_metric_label = st.selectbox(
+            "Sort by Metric",
+            list(available_metrics.keys()),
+            key="leaderboard_metric"
+        )
+        sort_metric = available_metrics[sort_metric_label]
+    
+    with filter_col2:
+        # Position filter - use all_data not filtered_df
+        positions = ['All'] + sorted(all_data['position'].dropna().unique().tolist())
+        selected_pos = st.selectbox(
+            "Position",
+            positions,
+            key="leaderboard_position"
+        )
+    
+    with filter_col3:
+        # Team filter - use all_data not filtered_df
+        teams = ['All'] + sorted(all_data['team_short'].dropna().unique().tolist())
+        selected_team = st.selectbox(
+            "Team",
+            teams,
+            key="leaderboard_team"
+        )
+    
+    with filter_col4:
+        # Minimum minutes filter
+        min_mins_options = [0, 180, 360, 450, 540, 900]
+        leaderboard_min_mins = st.selectbox(
+            "Min Minutes",
+            min_mins_options,
+            index=3,  # Default to 450
+            key="leaderboard_minutes"
+        )
+    
+    # Price range filter (below)
+    price_col1, price_col2, price_col3 = st.columns([1, 1, 2])
+    
+    with price_col1:
+        min_price = st.number_input(
+            "Min Price (£m)",
+            min_value=3.5,
+            max_value=15.0,
+            value=3.5,
+            step=0.5,
+            key="leaderboard_min_price"
+        )
+    
+    with price_col2:
+        max_price = st.number_input(
+            "Max Price (£m)",
+            min_value=3.5,
+            max_value=15.0,
+            value=15.0,
+            step=0.5,
+            key="leaderboard_max_price"
+        )
+    
+    # Apply filters - start with all_data, not filtered_df
+    leaderboard_df = all_data.copy()
+    
+    # Filter by position
+    if selected_pos != 'All':
+        leaderboard_df = leaderboard_df[leaderboard_df['position'] == selected_pos]
+    
+    # Filter by team
+    if selected_team != 'All':
+        leaderboard_df = leaderboard_df[leaderboard_df['team_short'] == selected_team]
+    
+    # Filter by minutes
+    leaderboard_df = leaderboard_df[leaderboard_df['total_minutes'] >= leaderboard_min_mins]
+    
+    # Filter by price
+    leaderboard_df = leaderboard_df[
+        (leaderboard_df['price'] >= min_price) & 
+        (leaderboard_df['price'] <= max_price)
+    ]
+    
+    # Sort by selected metric and get top 20
+    if len(leaderboard_df) > 0:
+        # Get the metric value for display
+        leaderboard_df = leaderboard_df.sort_values(sort_metric, ascending=False).head(20)
+        
+        # Select columns to display
+        display_cols = ['player_name', 'team_short', 'position', 'price', 'total_points', 'total_minutes']
+        
+        # Add the sort metric
+        if sort_metric not in display_cols:
+            display_cols.append(sort_metric)
+        
+        # Add related metrics based on what's selected
+        related_metrics = {
+            'xGI_per90_season': ['xG_per90_season', 'points_per90_season', 'total_xGI'],
+            'xG_per90_season': ['xGI_per90_season', 'points_per90_season', 'goals_scored'],
+            'points_per90_season': ['xGI_per90_season', 'total_points', 'total_xGI'],
+            'xGI_per90_last_5': ['xG_per90_last_5', 'points_per90_last_5', 'xGI_last_5'],
+            'xG_per90_last_5': ['xGI_per90_last_5', 'points_per90_last_5', 'goals_last_5'],
+            'xA_per90_last_5': ['xGI_per90_last_5', 'points_per90_last_5', 'assists_last_5'],
+            'points_per90_last_5': ['xGI_per90_last_5', 'xG_per90_last_5', 'points_last_5'],
+            'bps_per90_season': ['bonus_per90_season', 'points_per90_season', 'bps'],
+            'bonus_per90_season': ['bps_per90_season', 'points_per90_season', 'bonus'],
+            'defensive_contribution_per90_season': ['points_per90_season', 'tackles_per90_season', 'defensive_contribution']
+        }
+        
+        # Add related metrics if they exist
+        if sort_metric in related_metrics:
+            for metric in related_metrics[sort_metric]:
+                if metric in leaderboard_df.columns and metric not in display_cols:
+                    display_cols.append(metric)
+        
+        # Filter to only existing columns
+        display_cols = [col for col in display_cols if col in leaderboard_df.columns]
+        
+        leaderboard_display = leaderboard_df[display_cols].copy()
+        
+        # Create nice column names
+        col_name_mapping = {
+            'player_name': 'Player',
+            'team_short': 'Team',
+            'position': 'Pos',
+            'price': 'Price',
+            'total_points': 'Points',
+            'total_minutes': 'Mins',
+            'xGI_per90_season': 'xGI/90',
+            'xG_per90_season': 'xG/90',
+            'xA_per90_season': 'xA/90',
+            'points_per90_season': 'Pts/90',
+            'xGI_per90_last_5': 'xGI/90 L5',
+            'xG_per90_last_5': 'xG/90 L5',
+            'xA_per90_last_5': 'xA/90 L5',
+            'points_per90_last_5': 'Pts/90 L5',
+            'bps_per90_season': 'BPS/90',
+            'bonus_per90_season': 'Bonus/90',
+            'defensive_contribution_per90_season': 'DC/90',
+            'tackles_per90_season': 'Tackles/90',
+            'total_xGI': 'xGI',
+            'goals_scored': 'Goals',
+            'assists': 'Assists',
+            'goals_last_5': 'Goals L5',
+            'assists_last_5': 'Assists L5',
+            'xGI_last_5': 'xGI L5',
+            'points_last_5': 'Pts L5',
+            'bps': 'BPS',
+            'bonus': 'Bonus',
+            'defensive_contribution': 'DC'
+        }
+        
+        # Rename columns
+        leaderboard_display.columns = [col_name_mapping.get(col, col) for col in leaderboard_display.columns]
+        
+        # Format numbers
+        format_spec = {
+            'Price': '{:.1f}',
+            'Points': '{:.0f}',
+            'Mins': '{:.0f}',
+            'Goals': '{:.0f}',
+            'Assists': '{:.0f}',
+            'Goals L5': '{:.0f}',
+            'Assists L5': '{:.0f}',
+            'BPS': '{:.0f}',
+            'Bonus': '{:.0f}',
+            'DC': '{:.0f}'
+        }
+        
+        # Add format for all per 90 and decimal metrics
+        for col in leaderboard_display.columns:
+            if '/90' in col or col in ['xGI', 'xGI L5', 'Pts L5']:
+                format_spec[col] = '{:.2f}'
+        
+        # Get the display name of sort metric for highlighting
+        sort_metric_display = col_name_mapping.get(sort_metric, sort_metric)
+        
+        # Display with gradient on sort metric
+        st.dataframe(
+            leaderboard_display.style.format(format_spec).background_gradient(
+                subset=[sort_metric_display] if sort_metric_display in leaderboard_display.columns else None, 
+                cmap='RdYlGn'
+            ),
+            use_container_width=True,
+            hide_index=True,
+            height=600
+        )
+        
+        # Show summary stats
+        st.caption(f"Showing {len(leaderboard_display)} players | Sorted by **{sort_metric_label}** | Min {leaderboard_min_mins} minutes")
+    else:
+        st.info("No players match the current filters. Try adjusting your selections.")
 
 def show_form_trends(df, match_data):
     """Show form trends and hot/cold players"""
     
     st.subheader("🔥 Form Analysis")
     
+    # Create form flags if they don't exist
+    df = df.copy()
+    
+    # Check if hot_form and cold_form exist, if not create them
+    if 'hot_form' not in df.columns:
+        # Hot form: significantly better recent form
+        df['hot_form'] = (
+            (df['form_trend_points'] > 1.0) & 
+            (df['minutes_last_5'] >= 270)  # At least 3 games
+        )
+    
+    if 'cold_form' not in df.columns:
+        # Cold form: significantly worse recent form
+        df['cold_form'] = (
+            (df['form_trend_points'] < -1.0) & 
+            (df['minutes_last_5'] >= 270)  # At least 3 games
+        )
+    
     # Hot form players
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("#### 📈 Players in Hot Form")
-        hot_players = df[df['hot_form'] == True].nlargest(10, 'form_trend_points')[
-            ['player_name', 'position', 'points_per90_season', 'points_per90_last_5', 
-             'form_trend_points', 'minutes_last_5']
-        ].copy()
         
-        if len(hot_players) > 0:
+        # Filter for hot form
+        hot_df = df[df['hot_form'] == True]
+        
+        if len(hot_df) > 0:
+            hot_players = hot_df.nlargest(10, 'form_trend_points')[
+                ['player_name', 'position', 'points_per90_season', 'points_per90_last_5', 
+                 'form_trend_points', 'minutes_last_5']
+            ].copy()
+            
             hot_players.columns = ['Player', 'Pos', 'Season Pts/90', 'Recent Pts/90', 'Trend', 'Mins L5']
             st.dataframe(
                 hot_players.style.format({
@@ -242,16 +527,20 @@ def show_form_trends(df, match_data):
                 hide_index=True
             )
         else:
-            st.info("No players currently in hot form (min 5 games, +1.0 pts/90 improvement)")
+            st.info("No players currently in hot form (min 3 games, +1.0 pts/90 improvement)")
     
     with col2:
         st.markdown("#### 📉 Cold Form Players")
-        cold_players = df[df['form_trend_points'] < -1.0].nsmallest(10, 'form_trend_points')[
-            ['player_name', 'position', 'points_per90_season', 'points_per90_last_5', 
-             'form_trend_points', 'minutes_last_5']
-        ].copy()
         
-        if len(cold_players) > 0:
+        # Filter for cold form
+        cold_df = df[df['cold_form'] == True]
+        
+        if len(cold_df) > 0:
+            cold_players = cold_df.nsmallest(10, 'form_trend_points')[
+                ['player_name', 'position', 'points_per90_season', 'points_per90_last_5', 
+                 'form_trend_points', 'minutes_last_5']
+            ].copy()
+            
             cold_players.columns = ['Player', 'Pos', 'Season Pts/90', 'Recent Pts/90', 'Trend', 'Mins L5']
             st.dataframe(
                 cold_players.style.format({
@@ -259,187 +548,198 @@ def show_form_trends(df, match_data):
                     'Recent Pts/90': '{:.2f}',
                     'Trend': '{:+.2f}',
                     'Mins L5': '{:.0f}'
-                }).background_gradient(subset=['Trend'], cmap='RdYlGn_r'),
+                }).background_gradient(subset=['Trend'], cmap='RdYlGn'),
                 use_container_width=True,
                 hide_index=True
             )
         else:
-            st.info("No players in cold form")
+            st.info("No players currently in cold form (min 3 games, -1.0 pts/90 decline)")
     
-    # Form trend visualization
-    st.markdown("#### 📊 Form Trend Distribution")
+    # Form distribution by position
+    st.markdown("---")
+    st.markdown("#### 📊 Form Distribution by Position")
     
-    fig = go.Figure()
+    # Filter players with enough minutes
+    form_df = df[df['total_minutes'] >= 450].copy()
     
-    for pos in df['position'].unique():
-        pos_data = df[df['position'] == pos]
-        fig.add_trace(go.Box(
-            y=pos_data['form_trend_points'],
-            name=pos,
-            boxmean='sd'
-        ))
-    
-    fig.update_layout(
-        title='Form Trend Distribution by Position',
-        yaxis_title='Form Trend (Recent - Season Pts/90)',
-        showlegend=True,
-        height=400
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Top xGI performers (recent)
-    st.markdown("#### ⚡ Top xGI/90 (Last 5 Games)")
-    
-    top_xgi = df[df['minutes_last_5'] >= 200].nlargest(15, 'xGI_per90_last_5')[
-        ['player_name', 'position', 'xGI_per90_last_5', 'goals_last_5', 
-         'assists_last_5', 'points_last_5', 'minutes_last_5']
-    ].copy()
-    
-    top_xgi.columns = ['Player', 'Pos', 'xGI/90', 'Goals', 'Assists', 'Points', 'Minutes']
-    
-    st.dataframe(
-        top_xgi.style.format({
-            'xGI/90': '{:.2f}',
-            'Goals': '{:.0f}',
-            'Assists': '{:.0f}',
-            'Points': '{:.0f}',
-            'Minutes': '{:.0f}'
-        }).background_gradient(subset=['xGI/90'], cmap='Blues'),
-        use_container_width=True,
-        hide_index=True
-    )
+    if len(form_df) > 0:
+        fig = px.box(
+            form_df,
+            x='position',
+            y='form_trend_points',
+            color='position',
+            points='all',
+            hover_data=['player_name', 'points_per90_season', 'points_per90_last_5'],
+            labels={
+                'form_trend_points': 'Form Trend (Pts/90)',
+                'position': 'Position'
+            },
+            color_discrete_map={
+                'FWD': '#e74c3c',
+                'MID': '#3498db',
+                'DEF': '#2ecc71',
+                'GKP': '#f39c12'
+            }
+        )
+        
+        fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
+        fig.update_layout(height=400, showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
 
 def show_value_analysis(df):
-    """Show value analysis and efficiency metrics"""
+    """Show value analysis - over/under performers"""
     
     st.subheader("💎 Value Analysis")
     
-    # Points per price (if price data available)
-    st.markdown("#### 🎯 xG Overperformance")
-    
+    # xG Overperformers
     col1, col2 = st.columns(2)
     
     with col1:
-        # Over-performers
-        over_performers = df[df['total_xG'] > 1].nlargest(15, 'xG_overperformance')[
-            ['player_name', 'position', 'goals_scored', 'total_xG', 'xG_overperformance']
-        ].copy()
+        st.markdown("#### 📈 Goals vs xG (Overperformers)")
         
-        over_performers.columns = ['Player', 'Pos', 'Goals', 'xG', 'Diff']
+        # Filter players with meaningful xG
+        xg_df = df[(df['total_xG'] >= 1.0) & (df['total_minutes'] >= 450)].copy()
         
-        st.markdown("**Top xG Over-performers**")
-        st.dataframe(
-            over_performers.style.format({
-                'Goals': '{:.0f}',
-                'xG': '{:.2f}',
-                'Diff': '{:+.2f}'
-            }).background_gradient(subset=['Diff'], cmap='Greens'),
-            use_container_width=True,
-            hide_index=True
-        )
+        if len(xg_df) > 0:
+            fig = px.scatter(
+                xg_df,
+                x='total_xG',
+                y='goals_scored',
+                color='xG_overperformance',
+                size='total_minutes',
+                hover_data=['player_name', 'position', 'price', 'team_short'],
+                labels={
+                    'total_xG': 'Expected Goals (xG)',
+                    'goals_scored': 'Actual Goals',
+                    'xG_overperformance': 'xG Overperformance'
+                },
+                color_continuous_scale='RdYlGn'
+            )
+            
+            # Add diagonal line for expected = actual
+            max_val = max(xg_df['total_xG'].max(), xg_df['goals_scored'].max())
+            fig.add_trace(
+                go.Scatter(
+                    x=[0, max_val],
+                    y=[0, max_val],
+                    mode='lines',
+                    line=dict(color='gray', dash='dash'),
+                    showlegend=False
+                )
+            )
+            
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Show top overperformers
+            st.markdown("##### Top 5 xG Overperformers")
+            top_over = xg_df.nlargest(5, 'xG_overperformance')[
+                ['player_name', 'position', 'goals_scored', 'total_xG', 'xG_overperformance']
+            ].copy()
+            top_over.columns = ['Player', 'Pos', 'Goals', 'xG', 'Diff']
+            st.dataframe(
+                top_over.style.format({
+                    'Goals': '{:.0f}',
+                    'xG': '{:.2f}',
+                    'Diff': '{:+.2f}'
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
     
     with col2:
-        # Under-performers
-        under_performers = df[df['total_xG'] > 1].nsmallest(15, 'xG_overperformance')[
-            ['player_name', 'position', 'goals_scored', 'total_xG', 'xG_overperformance']
-        ].copy()
+        st.markdown("#### 📉 Goals vs xG (Underperformers)")
         
-        under_performers.columns = ['Player', 'Pos', 'Goals', 'xG', 'Diff']
+        if len(xg_df) > 0:
+            # Show top underperformers  
+            st.markdown("##### Top 5 xG Underperformers (Due a Goal)")
+            under_df = xg_df[xg_df['xG_overperformance'] < 0]
+            if len(under_df) > 0:
+                top_under = under_df.nsmallest(5, 'xG_overperformance')[
+                    ['player_name', 'position', 'goals_scored', 'total_xG', 'xG_overperformance']
+                ].copy()
+                top_under.columns = ['Player', 'Pos', 'Goals', 'xG', 'Diff']
+                st.dataframe(
+                    top_under.style.format({
+                        'Goals': '{:.0f}',
+                        'xG': '{:.2f}',
+                        'Diff': '{:+.2f}'
+                    }),
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("No significant xG underperformers")
         
-        st.markdown("**Top xG Under-performers**")
-        st.dataframe(
-            under_performers.style.format({
-                'Goals': '{:.0f}',
-                'xG': '{:.2f}',
-                'Diff': '{:+.2f}'
-            }).background_gradient(subset=['Diff'], cmap='Reds_r'),
-            use_container_width=True,
-            hide_index=True
-        )
+        # xA analysis
+        st.markdown("---")
+        st.markdown("##### Assists vs xA")
+        xa_df = df[(df['total_xA'] >= 1.0) & (df['total_minutes'] >= 450)].copy()
+        
+        if len(xa_df) > 0:
+            top_xa_over = xa_df.nlargest(5, 'xA_overperformance')[
+                ['player_name', 'position', 'assists', 'total_xA', 'xA_overperformance']
+            ].copy()
+            top_xa_over.columns = ['Player', 'Pos', 'Assists', 'xA', 'Diff']
+            
+            st.markdown("**Top 5 xA Overperformers**")
+            st.dataframe(
+                top_xa_over.style.format({
+                    'Assists': '{:.0f}',
+                    'xA': '{:.2f}',
+                    'Diff': '{:+.2f}'
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
     
-    # Scatter: Goals vs xG
-    st.markdown("#### 📊 Goals vs Expected Goals (xG)")
+    # Points per price efficiency
+    st.markdown("---")
+    st.markdown("#### 💰 Points per Million (Efficiency)")
     
-    fig = px.scatter(
-        df[df['total_xG'] > 0],
-        x='total_xG',
-        y='goals_scored',
-        color='position',
-        size='total_minutes',
-        hover_name='player_name',
-        hover_data={
-            'total_xG': ':.2f',
-            'goals_scored': True,
-            'xG_overperformance': ':.2f',
-            'fixtures_played': True
-        },
-        title='Actual Goals vs Expected Goals (xG)',
-        labels={
-            'total_xG': 'Expected Goals (xG)',
-            'goals_scored': 'Actual Goals',
-            'position': 'Position'
-        },
-        color_discrete_map={
-            'FWD': '#e74c3c',
-            'MID': '#3498db',
-            'DEF': '#2ecc71',
-            'GK': '#f39c12'
-        }
-    )
-    
-    # Add diagonal line (perfect xG match)
-    max_val = max(df['total_xG'].max(), df['goals_scored'].max())
-    fig.add_trace(go.Scatter(
-        x=[0, max_val],
-        y=[0, max_val],
-        mode='lines',
-        line=dict(color='gray', dash='dash'),
-        name='Expected (xG = Goals)',
-        showlegend=True
-    ))
-    
-    fig.update_layout(height=500)
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Efficiency metrics
-    st.markdown("#### 🎖️ Efficiency Leaders")
+    efficiency_df = df[df['total_minutes'] >= 450].copy()
+    efficiency_df['pts_per_million'] = efficiency_df['total_points'] / efficiency_df['price']
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("**Best Points/90 (Season)**")
-        best_pts_90 = df[df['total_minutes'] >= 450].nlargest(10, 'points_per90_season')[
-            ['player_name', 'position', 'total_points', 'total_minutes', 'points_per90_season']
+        st.markdown("##### Best Value Players (All)")
+        best_value = efficiency_df.nlargest(10, 'pts_per_million')[
+            ['player_name', 'position', 'price', 'total_points', 'pts_per_million']
         ].copy()
-        best_pts_90.columns = ['Player', 'Pos', 'Points', 'Minutes', 'Pts/90']
+        best_value.columns = ['Player', 'Pos', 'Price', 'Points', 'Pts/£m']
         st.dataframe(
-            best_pts_90.style.format({
+            best_value.style.format({
+                'Price': '{:.1f}',
                 'Points': '{:.0f}',
-                'Minutes': '{:.0f}',
-                'Pts/90': '{:.2f}'
-            }),
+                'Pts/£m': '{:.1f}'
+            }).background_gradient(subset=['Pts/£m'], cmap='YlGn'),
             use_container_width=True,
             hide_index=True
         )
     
     with col2:
-        st.markdown("**Best Bonus/90**")
-        best_bonus = df[df['total_minutes'] >= 450].assign(
-            bonus_per90=lambda x: x['bonus'] * 90 / x['total_minutes']
-        ).nlargest(10, 'bonus_per90')[
-            ['player_name', 'position', 'bonus', 'total_minutes', 'bonus_per90']
-        ].copy()
-        best_bonus.columns = ['Player', 'Pos', 'Bonus', 'Minutes', 'Bonus/90']
-        st.dataframe(
-            best_bonus.style.format({
-                'Bonus': '{:.0f}',
-                'Minutes': '{:.0f}',
-                'Bonus/90': '{:.2f}'
-            }),
-            use_container_width=True,
-            hide_index=True
-        )
+        st.markdown("##### Best Value by Position")
+        
+        for pos in ['FWD', 'MID', 'DEF']:
+            pos_df = efficiency_df[efficiency_df['position'] == pos]
+            if len(pos_df) > 0:
+                best_pos = pos_df.nlargest(3, 'pts_per_million')[
+                    ['player_name', 'price', 'total_points', 'pts_per_million']
+                ].copy()
+                best_pos.columns = ['Player', 'Price', 'Points', 'Pts/£m']
+                
+                st.markdown(f"**{pos}**")
+                st.dataframe(
+                    best_pos.style.format({
+                        'Price': '{:.1f}',
+                        'Points': '{:.0f}',
+                        'Pts/£m': '{:.1f}'
+                    }),
+                    use_container_width=True,
+                    hide_index=True,
+                    height=140
+                )
 
 # Call the main show function
 show(player_data, match_data)
