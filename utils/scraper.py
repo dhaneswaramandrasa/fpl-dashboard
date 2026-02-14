@@ -733,7 +733,7 @@ class ComprehensiveFPLScraper:
         if completed.empty:
             return pd.DataFrame(), pd.DataFrame()
         
-        max_gw = completed['event'].max()
+        max_gw = int(completed['event'].max())
         recent_gws = list(range(max(1, max_gw - 5), max_gw + 1))
         recent_fixtures = completed[completed['event'].isin(recent_gws)]
         
