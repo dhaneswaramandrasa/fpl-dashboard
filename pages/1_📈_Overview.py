@@ -408,8 +408,7 @@ def show_performance_analysis(df):
         selected_team = st.selectbox("Team", teams, key="leaderboard_team")
     
     with filter_col4:
-        min_mins_options = [0, 180, 360, 450, 540, 900]
-        leaderboard_min_mins = st.selectbox("Min Minutes", min_mins_options, index=3, key="leaderboard_minutes")
+        leaderboard_min_mins = st.slider("Min Minutes", min_value=0, max_value=2700, value=450, step=90, key="leaderboard_minutes")
     
     price_col1, price_col2, price_col3 = st.columns([1, 1, 2])
     
