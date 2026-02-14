@@ -102,3 +102,16 @@ def get_player_list(df, position=None, min_minutes=0):
 def get_position_list(df):
     """Get list of unique positions"""
     return sorted(df['position'].unique())
+
+def download_fpl_data():
+    """Download data with Understat integration"""
+    scraper = ComprehensiveFPLScraper()
+    scraper.initialize_mappings()
+    
+    # Use the new method
+    df = scraper.scrape_with_understat()
+    
+    # Scrape team data
+    scraper.scrape_team_stats()
+    
+    return df

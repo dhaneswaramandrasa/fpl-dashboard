@@ -3,7 +3,7 @@ Overview Page - High Level FPL Statistics
 Shows top performers, trends, and key metrics
 
 ENHANCED: Custom Leaderboard includes comprehensive home/away metrics + npxG metrics
-Version: With npxG/90 (Season, Last 5, Home, Away)
+Version: With npxG/90 (Season, Last 5, Home, Away) + Understat Integration
 """
 
 import streamlit as st
@@ -35,6 +35,7 @@ if 'player_data' not in st.session_state or st.session_state.player_data is None
 # Get data from session state
 player_data = st.session_state.player_data
 match_data = st.session_state.match_data
+
 
 def show(player_data, match_data):
     """Display overview page"""
@@ -130,6 +131,67 @@ def show(player_data, match_data):
     
     with tab3:
         show_value_analysis(filtered_df)
+    
+    # ============================================================================
+    # ADD UNDERSTAT TABLES HERE - Inside the show() function, after the tabs
+    # ============================================================================
+    st.markdown("---")
+    st.markdown("### 🎯 Statistical Analysis - Goals & Assists Imminent")
+    
+    # Try to import and use Understat integration
+    try:
+        from utils.smart_understat_integration import UnderstatPackageIntegration
+        
+        understat = UnderstatPackageIntegration()
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            goals_imm = understat.get_goals_imminent(filtered_df)  # Use filtered_df here
+            if len(goals_imm) > 0:
+                st.subheader("⚽ Goals Imminent")
+                st.caption("High shots, low goals - due to score soon")
+                st.dataframe(
+                    goals_imm.head(10).style.format({
+                        'price': '{:.1f}',
+                        'total_shots': '{:.0f}',
+                        'shots_per_90': '{:.2f}',
+                        'goals_scored': '{:.0f}',
+                        'expected_goals': '{:.2f}',
+                        'xG_delta': '{:+.2f}',
+                        'shot_conversion': '{:.1f}'
+                    }),
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.info("⚽ No players currently meet 'Goals Imminent' criteria")
+        
+        with col2:
+            assists_imm = understat.get_assists_imminent(filtered_df)  # Use filtered_df here
+            if len(assists_imm) > 0:
+                st.subheader("🅰️ Assists Imminent")
+                st.caption("High chances created, low assists - due to assist soon")
+                st.dataframe(
+                    assists_imm.head(10).style.format({
+                        'price': '{:.1f}',
+                        'chances_created': '{:.0f}',
+                        'chances_created_per_90': '{:.2f}',
+                        'assists': '{:.0f}',
+                        'expected_assists': '{:.2f}',
+                        'xA_delta': '{:+.2f}'
+                    }),
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.info("🅰️ No players currently meet 'Assists Imminent' criteria")
+    
+    except ImportError:
+        st.info("💡 Install understatapi for shot and chance data: `pip install understatapi`")
+    except Exception as e:
+        st.warning(f"⚠️ Could not load shot data: {str(e)[:100]}")
+
 
 def show_performance_analysis(df):
     """Show performance scatter plots and top performers"""
@@ -302,10 +364,24 @@ def show_performance_analysis(df):
             
             # Differentials
             'Home/Away Points Diff': 'home_away_points_diff',
-            'Home/Away xGI Diff': 'home_away_xGI_diff'
+            'Home/Away xGI Diff': 'home_away_xGI_diff',
+
+            # Shooting & Creation (if available)
+            '---SHOOTING---': None,
+            'Total Shots': 'total_shots',
+            'Shots/90': 'shots_per_90',
+            'Shot Conversion %': 'shot_conversion',
+            'xG per Shot': 'xG_per_shot',
+            
+            '---CREATION---': None,
+            'Chances Created': 'chances_created',
+            'Chances/90': 'chances_created_per_90',
+            'xGChain': 'xGChain',
+            'xGBuildup': 'xGBuildup'
         }
         
-        available_metrics = {k: v for k, v in metric_options.items() if v in all_data.columns}
+        # Filter to only show available metrics
+        available_metrics = {k: v for k, v in metric_options.items() if v is None or v in all_data.columns}
         
         if not available_metrics:
             st.warning("No per 90 metrics available in data")
@@ -317,6 +393,11 @@ def show_performance_analysis(df):
             key="leaderboard_metric"
         )
         sort_metric = available_metrics[sort_metric_label]
+    
+    # Only continue if a valid metric is selected (not a divider)
+    if sort_metric is None:
+        st.info("Please select a metric (not a divider)")
+        return
     
     with filter_col2:
         positions = ['All'] + sorted(all_data['position'].dropna().unique().tolist())
@@ -491,7 +572,17 @@ def show_performance_analysis(df):
             'points_last_5': 'Pts L5',
             'bps': 'BPS',
             'bonus': 'Bonus',
-            'defensive_contribution': 'DC'
+            'defensive_contribution': 'DC',
+            
+            # Understat columns
+            'total_shots': 'Shots',
+            'shots_per_90': 'Shots/90',
+            'shot_conversion': 'Conv%',
+            'xG_per_shot': 'xG/Shot',
+            'chances_created': 'Chances',
+            'chances_created_per_90': 'Chances/90',
+            'xGChain': 'xGChain',
+            'xGBuildup': 'xGBuildup'
         }
         
         leaderboard_display.columns = [col_name_mapping.get(col, col) for col in leaderboard_display.columns]
@@ -522,13 +613,17 @@ def show_performance_analysis(df):
             'Mins (H)': '{:.0f}',
             'Mins (A)': '{:.0f}',
             'Pts (H)': '{:.0f}',
-            'Pts (A)': '{:.0f}'
+            'Pts (A)': '{:.0f}',
+            'Shots': '{:.0f}',
+            'Chances': '{:.0f}',
+            'Conv%': '{:.1f}'
         }
         
         for col in leaderboard_display.columns:
             if '/90' in col or col in ['xGI', 'xGI L5', 'Pts L5', 'xGI (H)', 'xGI (A)', 
                                        'npxG', 'npxGI', 'npxG (H)', 'npxG (A)', 
-                                       'npxGI (H)', 'npxGI (A)', 'H/A Pts Diff', 'H/A xGI Diff']:
+                                       'npxGI (H)', 'npxGI (A)', 'H/A Pts Diff', 'H/A xGI Diff',
+                                       'xG/Shot', 'xGChain', 'xGBuildup']:
                 format_spec[col] = '{:.2f}'
         
         sort_metric_display = col_name_mapping.get(sort_metric, sort_metric)
@@ -547,7 +642,7 @@ def show_performance_analysis(df):
     else:
         st.info("No players match the current filters. Try adjusting your selections.")
 
-# Rest of the functions remain the same...
+
 def show_form_trends(df, match_data):
     """Show form trends and hot/cold players"""
     
@@ -637,6 +732,7 @@ def show_form_trends(df, match_data):
         fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
         fig.update_layout(height=400, showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
+
 
 def show_value_analysis(df):
     """Show value analysis"""
@@ -784,4 +880,6 @@ def show_value_analysis(df):
                     height=140
                 )
 
+
+# Call the main function
 show(player_data, match_data)

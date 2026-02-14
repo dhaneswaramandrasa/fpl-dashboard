@@ -1,11 +1,14 @@
 """
 Comprehensive Enhanced FPL Data Scraper
+NOW WITH SMART UNDERSTAT INTEGRATION!
+
 Includes:
 - npXG (Non-Penalty Expected Goals)
 - Defensive Contribution metrics
 - BPS/90 and Bonus/90
 - Home/Away form splits
 - Start percentage
+- SMART UNDERSTAT SHOT DATA (auto-matches 65-80% of players!)
 - All available FPL API fields
 """
 
@@ -775,11 +778,11 @@ class ComprehensiveFPLScraper:
 
 
 def scrape_all_data():
-    """Main function to scrape comprehensive FPL data"""
+    """Main function to scrape comprehensive FPL data + UNDERSTAT SHOT DATA"""
     scraper = ComprehensiveFPLScraper()
     
     print("="*70)
-    print("COMPREHENSIVE FPL DATA SCRAPER")
+    print("COMPREHENSIVE FPL DATA SCRAPER + UNDERSTAT")
     print("="*70)
     print("Initializing...")
     scraper.initialize_mappings()
@@ -796,9 +799,38 @@ def scrape_all_data():
         print("Aggregating comprehensive season stats...")
         player_df = scraper.aggregate_player_stats(match_df)
         
+        # ============= ADD UNDERSTAT SHOT DATA =============
+        try:
+            from utils.smart_understat_integration import SmartUnderstatIntegration
+            
+            print("\n" + "="*70)
+            print("📊 FETCHING SHOT DATA FROM UNDERSTAT")
+            print("="*70)
+            
+            understat = SmartUnderstatIntegration()
+            understat_data = understat.fetch_understat_data()
+            
+            if understat_data is not None and not understat_data.empty:
+                player_df = understat.merge_with_fpl(player_df, understat_data)
+                understat.save_cache(understat_data)
+                print("✅ Shot data successfully integrated!")
+            else:
+                print("⚠️ No Understat data available, continuing with FPL data only")
+        
+        except ImportError:
+            print("\n⚠️ SmartUnderstatIntegration not found")
+            print("💡 To add shot data, install: pip install understatapi")
+            print("   Then add smart_understat_integration.py to utils/")
+        except Exception as e:
+            print(f"⚠️ Understat integration error: {e}")
+            print("   Continuing with FPL data only...")
+        
+        print("\n" + "="*70)
+        # ============= END UNDERSTAT INTEGRATION =============
+        
         # Save match data
         match_df.to_csv(DATA_DIR / 'fpl_match_data.csv', index=False)
-        print(f"\n✅ Saved match data: {len(match_df)} records")
+        print(f"✅ Saved match data: {len(match_df)} records")
         
         # Save player aggregation
         player_df.to_csv(DATA_DIR / 'enhanced_player_aggregation.csv', index=False)
@@ -828,6 +860,23 @@ def scrape_all_data():
         print(f"   - Average home xGI/90: {player_df['xGI_home_per90'].mean():.3f}")
         print(f"   - Average away xGI/90: {player_df['xGI_away_per90'].mean():.3f}")
         
+        # Show shot data if available
+        if 'total_shots' in player_df.columns:
+            print(f"\n🎯 UNDERSTAT SHOT DATA:")
+            shots_players = (player_df['total_shots'] > 0).sum()
+            print(f"   - Players with shot data: {shots_players}/{len(player_df)} ({shots_players/len(player_df)*100:.1f}%)")
+            
+            if 'shots_per_90' in player_df.columns:
+                avg_shots = player_df[player_df['total_shots'] > 0]['shots_per_90'].mean()
+                print(f"   - Average shots per 90: {avg_shots:.2f}")
+            
+            if 'key_passes_per_90' in player_df.columns and 'chances_created' in player_df.columns:
+                avg_kp = player_df[player_df['chances_created'] > 0]['key_passes_per_90'].mean()
+                print(f"   - Average key passes per 90: {avg_kp:.2f}")
+            elif 'chances_created_per_90' in player_df.columns and 'chances_created' in player_df.columns:
+                avg_kp = player_df[player_df['chances_created'] > 0]['chances_created_per_90'].mean()
+                print(f"   - Average chances created per 90: {avg_kp:.2f}")
+        
         print("\n" + "="*70)
         print("AVAILABLE COLUMNS")
         print("="*70)
@@ -844,6 +893,15 @@ def scrape_all_data():
         for col in new_cols:
             if col in player_df.columns:
                 print(f"  ✓ {col}")
+        
+        # Show Understat columns if available
+        if 'total_shots' in player_df.columns:
+            print("\n🎯 Understat Shot Metrics:")
+            understat_cols = ['total_shots', 'shots_per_90', 'chances_created', 'key_passes_per_90', 
+                            'xG_per_shot', 'shot_conversion', 'xGChain', 'xGBuildup']
+            for col in understat_cols:
+                if col in player_df.columns:
+                    print(f"  ✓ {col}")
         
         print("\n🏠 Home/Away Metrics:")
         home_away_cols = [col for col in player_df.columns if '_home_per90' in col or '_away_per90' in col]
